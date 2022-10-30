@@ -19,6 +19,13 @@
 #include "Security.h"
 #include "MedicalCenter.h"
 #include "Recycling.h"
+#include "HotelSingle.h"
+#include "HotelDouble.h"
+#include "HotelSuite.h"
+#include "ParkingRamp.h"
+#include "ParkingSpace.h"
+#include "Shop.h"
+#include "Housekeeping.h"
 
 using namespace OT;
 using namespace Item;
@@ -55,6 +62,13 @@ void Factory::loadPrototypes()
 	register_item(Security);
 	register_item(MedicalCenter);
 	register_item(Recycling);
+	register_item(HotelSingle);
+	register_item(HotelDouble);
+	register_item(HotelSuite);
+	register_item(ParkingRamp);
+	register_item(ParkingSpace);
+	register_item(Shop);
+	register_item(Housekeeping);
 	#undef register_item
 	
 	for (int i = 0; i < prototypes.size(); i++) {
