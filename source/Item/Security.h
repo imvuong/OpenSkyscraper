@@ -1,5 +1,6 @@
 #pragma once
 #include "../Sprite.h"
+#include "../Game.h" // Required for Game::time access in advance
 #include "Item.h"
 #include <set>
 
@@ -18,13 +19,23 @@ namespace OT {
             }
             virtual ~Security();
 
-            virtual void init();
+            virtual void init() override;
+            virtual void advance(double dt) override;
+
+            virtual void encodeXML(tinyxml2::XMLPrinter & xml) override;
+            virtual void decodeXML(tinyxml2::XMLElement & xml) override;
 
             int variant;
 
             Sprite sprite;
             bool spriteNeedsUpdate;
             void updateSprite();
+
+            void setAlert(bool isAlerting);
+
+            static const int kMonthlySimTowerCost = 10000;
+            // Assuming 4 weeks per month for a weekly deduction if game time is weekly based
+            static const int kWeeklyOperatingCost = kMonthlySimTowerCost / 4;
         };
     }
 }
