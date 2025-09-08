@@ -59,10 +59,11 @@ Game::Game(Application & app)
 
 	reloadGUI();
 
-	cockSound.setBuffer(app.sounds["simtower/cock"]);
-	morningSound.setBuffer(app.sounds["simtower/birds/morning"]);
-	bellsSound.setBuffer(app.sounds["simtower/bells"]);
-	eveningSound.setBuffer(app.sounds["simtower/birds/evening"]);
+	morningSound = new sf::Sound();
+	// cockSound.setBuffer(app.sounds["simtower/cock"]);
+	morningSound->setBuffer(app.sounds["simtower/birds/morning"]);
+	// bellsSound.setBuffer(app.sounds["simtower/bells"]);
+	// eveningSound.setBuffer(app.sounds["simtower/birds/evening"]);
 
 	//DEBUG: load from disk.
 	// tinyxml2::XMLDocument xml;
@@ -76,10 +77,33 @@ Game::Game(Application & app)
 
 Game::~Game()
 {
+	LOG(IMPORTANT, "Game::~Game() ENTERED");
 	for (ItemSet::iterator i = items.begin(); i != items.end(); i++) delete *i;
 	items.clear();
 	itemsByFloor.clear();
 	itemsByType.clear();
+
+	// morningSound->setLoop(false);
+	LOG(IMPORTANT, "Game::~Game() - Cleaning up morningSound");
+	if (morningSound) {
+		morningSound->stop();
+		delete(morningSound);
+		morningSound = NULL;
+	}
+
+	LOG(IMPORTANT, "Game::~Game() - Cleaning up autoreleaseSounds");
+	// Explicitly stop and delete all sounds managed by autoreleaseSounds
+	for (SoundSet::iterator it = autoreleaseSounds.begin(); it != autoreleaseSounds.end(); ++it) {
+		(*it)->Stop(); // Ensure it's stopped and removed from playingSounds
+		delete (*it);  // Delete the dynamically allocated Sound object
+	}
+	autoreleaseSounds.clear();
+	LOG(IMPORTANT, "Game::~Game() - autoreleaseSounds CLEANED");
+
+	// By this point, playingSounds should be empty if all sounds were managed correctly.
+	// If not, this will at least ensure they are marked as stopped from the game's perspective.
+	playingSounds.clear(); // Clearing the set of pointers, actual objects handled above or are members.
+	LOG(IMPORTANT, "Game::~Game() EXITED");
 }
 
 void Game::activate()
@@ -503,11 +527,15 @@ void Game::advance(double dt)
 	}
 
 	//Play sounds.
-	if (time.checkHour(5))  cockSound.Play(this);
-	if (time.checkHour(6))  morningSound.Play(this);
-	if (time.checkHour(9))  bellsSound.Play(this);
-	if (time.checkHour(18)) eveningSound.Play(this);
-	morningSound.setLoop(time.hour < 8);
+	// if (time.checkHour(5))  cockSound.Play(this);
+	if (time.checkHour(5))  playOnce("simtower/cock");
+	if (time.checkHour(6))  morningSound->play();
+	// if (time.checkHour(6))  playOnce("simtower/birds/morning");
+	// if (time.checkHour(9))  bellsSound.Play(this);
+	if (time.checkHour(5))  playOnce("simtower/bells");
+	// if (time.checkHour(18)) eveningSound.Play(this);
+	if (time.checkHour(18)) playOnce("simtower/birds/evening");
+	// morningSound->setLoop(time.hour < 8);
 
 	//Constrain the POI.
 	double2 halfsize((win.getView().getSize().x)*0.5*zoom, (win.getView().getSize().y)*0.5*zoom);

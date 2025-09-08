@@ -86,10 +86,10 @@ namespace OT {
 		bool draggingElevatorLower;
 		int draggingMotor;
 
-		Sound cockSound;
-		Sound morningSound;
-		Sound bellsSound;
-		Sound eveningSound;
+		// Sound cockSound;
+		sf::Sound *morningSound;
+		// Sound bellsSound;
+		// Sound eveningSound;
 
 		typedef std::set<Sound *> SoundSet;
 		SoundSet autoreleaseSounds;
