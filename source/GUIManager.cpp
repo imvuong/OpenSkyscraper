@@ -15,6 +15,7 @@ GUIManager::GUIManager()
 GUIManager::~GUIManager()
 {
 	//TODO: do cleanup here.
+	// Rocket::Core::Shutdown(); // Shutdown libRocket
 }
 
 bool GUIManager::init(sf::RenderWindow * window)
