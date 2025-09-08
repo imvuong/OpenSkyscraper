@@ -15,6 +15,9 @@ namespace OT
 	public:
 		char debugString[512];
 		State(std::string name);
+		virtual ~State();
+		
+		std::string name;
 		
 		GUI gui;
 		

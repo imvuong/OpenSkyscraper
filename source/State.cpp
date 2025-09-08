@@ -10,6 +10,10 @@ State::State(std::string name) : gui(name, &App->gui)
 	active = false;
 }
 
+State::~State()
+{
+}
+
 void State::activate()
 {
 	active = true;
