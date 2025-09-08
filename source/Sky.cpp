@@ -7,6 +7,7 @@
 
 using namespace OT;
 
+const double Sky::cloudSpeedX = 0.001; // Adjust this value for faster/slower clouds. SimTower's were quite slow.
 
 Sky::Sky(Game * game) : GameObject(game) {
 	from     = 0;
@@ -16,16 +17,21 @@ Sky::Sky(Game * game) : GameObject(game) {
 	rainAnimation = 0;
 	soundCountdown = 0;
 	thunderOverlay = 0;
+	cloudOffsetX = 0.0;
 
-	rainSound.setBuffer(app->sounds["simtower/rain"]);
-	rainSound.setLoop(true);
-	thunderSound.setBuffer(app->sounds["simtower/thunder"]);
-	birdsSound.setBuffer(app->sounds["simtower/birds/day"]);
-	cricketsSound.setBuffer(app->sounds["simtower/crickets"]);
+	// rainSound.setBuffer(app->sounds["simtower/rain"]);
+	// rainSound.setLoop(true);
+	// thunderSound.setBuffer(app->sounds["simtower/thunder"]);
+	// birdsSound.setBuffer(app->sounds["simtower/birds/day"]);
+	// cricketsSound.setBuffer(app->sounds["simtower/crickets"]);
+
 }
 
 void Sky::advance(double dt)
 {
+	// Update cloud offset for movement
+	cloudOffsetX += cloudSpeedX * dt;
+
 	//Decide whether we're about to have a rainy day.
 	if (game->time.checkHour(5)) {
 		rainyDay = ((rand() % 3) == 0); //Statistically, every 3rd day will be rainy.
@@ -78,10 +84,10 @@ void Sky::advance(double dt)
 	}
 
 	//Rain sounds.
-	if (rainyDay) {
-		if (game->time.checkHour(8))  rainSound.Play(game);
-		if (game->time.checkHour(16)) rainSound.Stop();
-	}
+	// if (rainyDay) {
+	// 	if (game->time.checkHour(8))  rainSound.Play(game);
+	// 	if (game->time.checkHour(16)) rainSound.Stop();
+	// }
 
 	if (thunderOverlay > 0) {
 		thunderOverlay *= exp(-dta * 7);
@@ -89,22 +95,22 @@ void Sky::advance(double dt)
 	}
 
 	//Sounds.
-	soundCountdown -= dta;
-	if (soundCountdown < 0) {
-		double duration = 0;
-		if (rainyDay && time >= 8 && time < 16) {
-			thunderSound.Play(game);
-			thunderOverlay = 1;
-			duration = thunderSound.getDurationDouble();
-		} else if (time >= 8 && time < 17) {
-			birdsSound.Play(game);
-			duration = birdsSound.getDurationDouble();
-		} else if (time >= 20 || time < 1.5) {
-			cricketsSound.Play(game);
-			duration = cricketsSound.getDurationDouble();
-		}
-		soundCountdown += Math::randd(duration + 0.5, duration + 10);
-	}
+	// soundCountdown -= dta;
+	// if (soundCountdown < 0) {
+	// 	double duration = 0;
+	// 	if (rainyDay && time >= 8 && time < 16) {
+	// 		thunderSound.Play(game);
+	// 		thunderOverlay = 1;
+	// 		duration = thunderSound.getDurationDouble();
+	// 	} else if (time >= 8 && time < 17) {
+	// 		birdsSound.Play(game);
+	// 		duration = birdsSound.getDurationDouble();
+	// 	} else if (time >= 20 || time < 1.5) {
+	// 		cricketsSound.Play(game);
+	// 		duration = cricketsSound.getDurationDouble();
+	// 	}
+	// 	soundCountdown += Math::randd(duration + 0.5, duration + 10);
+	// }
 }
 
 void Sky::draw(sf::RenderTarget & target, sf::RenderStates states) const
@@ -152,20 +158,21 @@ void Sky::render(sf::RenderTarget & target) const
 	for (int x = cmin.x; x <= cmax.x; x++) {
 		for (int y = cmin.y; y <= cmax.y; y++) {
 			int2 position(x*cloudGrid.x, -y*cloudGrid.y);
+			double2 noiseInputPositionBase(position.x + cloudOffsetX, position.y);
 
 			//Decide whether this location should have a cloud, based on the cloud noise
 			//function.
-			if (cloudNoise(position*45) < 0.3) continue;
+			if (cloudNoise(noiseInputPositionBase*45) < 0.3) continue;
 
 			//Decide what cloud variant to use. Multiplying the position with some arbitrary
 			//large number introduces a higher noise frequency so the clouds look more random.
 			//(...+1)*2 converts the noise range [-1,1] to [0,3].
-			int variant = (cloudNoise(position * 4672) + 1) * 2;
+			int variant = (cloudNoise(noiseInputPositionBase * 4672) + 1) * 2;
 			assert(variant >= 0 && variant <= 3);
 
 			//Introduce some jitter so the clouds don't look like they're on a grid.
-			double2 offset(cloudNoise(position * 941), cloudNoise(position * 786));
-			position += offset * 50;
+			double2 jitterOffset(cloudNoise(noiseInputPositionBase * 941), cloudNoise(noiseInputPositionBase * 786));
+			int2 finalPosition = position + int2(jitterOffset.x * 50, jitterOffset.y * 50);
 
 			char c[128];
 			snprintf(c, 128, "simtower/deco/cloud/%i", abs(variant)%4);
@@ -181,8 +188,8 @@ void Sky::render(sf::RenderTarget & target) const
 				cloud.setTextureRect(sf::IntRect(0, state*h, w, h));
 				// cloud.setScale(w, h);
 				cloud.setOrigin(w/2, h/2);
-				cloud.setColor(sf::Color(255, 255, 255, 255*(i == 0 ? 1.0 : progress)));
-				cloud.setPosition(position.x, position.y);
+				cloud.setColor(sf::Color(255, 255, 255, (sf::Uint8)(255 * (i == 0 ? 1.0f : (float)progress))));
+				cloud.setPosition(finalPosition.x, finalPosition.y);
 				target.draw(cloud);
 				game->drawnSprites++;
 			}
