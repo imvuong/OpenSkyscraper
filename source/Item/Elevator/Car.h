@@ -1,6 +1,6 @@
 #pragma once
 #include "../../GameObject.h"
-#include "../../Sound.h"
+// #include "../../Sound.h"
 #include "Elevator.h"
 
 namespace OT {
@@ -53,8 +53,8 @@ namespace OT {
 				double startAltitude;
 				double journeyTime;
 
-				Sound arrivingSound;
-				Sound departingSound;
+				// Sound arrivingSound;
+				// Sound departingSound;
 				bool arrivingPlayed;
 				bool departingPlayed;
 

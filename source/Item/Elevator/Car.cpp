@@ -18,8 +18,8 @@ void Car::init()
 	sprite.setOrigin(0, 30);
 	updateSprite();
 
-	arrivingSound.setBuffer(app->sounds["simtower/elevator/arriving"]);
-	departingSound.setBuffer(app->sounds["simtower/elevator/departing"]);
+	// arrivingSound.setBuffer(app->sounds["simtower/elevator/arriving"]);
+	// departingSound.setBuffer(app->sounds["simtower/elevator/departing"]);
 	arrivingPlayed = false;
 	departingPlayed = false;
 
@@ -214,18 +214,18 @@ void Car::advance(double dt)
 
 		//Now we also want to play some sounds. If the travel is long enough, we play the departing
 		//sound.
-		if (!departingPlayed) {
-			if (t1 >= 1) departingSound.Play(game);
-				//Audio::shared()->play(departingSound);
-			departingPlayed = true;
-		}
+		// if (!departingPlayed) {
+		// 	if (t1 >= 1) departingSound.Play(game);
+		// 		//Audio::shared()->play(departingSound);
+		// 	departingPlayed = true;
+		// }
 
 		//And as we approach the destination floor we also want the sound to be played.
-		if (!arrivingPlayed && (s - d) < 0.1) {
-			arrivingSound.Play(game);
-			//Audio::shared()->play(arrivingSound);
-			arrivingPlayed = true;
-		}
+		// if (!arrivingPlayed && (s - d) < 0.1) {
+		// 	arrivingSound.Play(game);
+		// 	//Audio::shared()->play(arrivingSound);
+		// 	arrivingPlayed = true;
+		// }
 
 		//We should probably show the inner workings of the algorithm in the console for debuggin.
 		//DEBUG: remove this log stuff later. Seems to work anyway.
