@@ -7,6 +7,9 @@ Build
 !.gitignore
 !.gitmodules
 
+data/resources
+data/SIMTOWER.EX_
+
 # Project Files
 *.kdev4
 *.anjuta
