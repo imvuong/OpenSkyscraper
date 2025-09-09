@@ -18,6 +18,10 @@ using namespace std;
 
 Application * OT::App = NULL;
 
+/** The application constructor. Initializes the application and sets up the logger.
+ *  @param argc The number of command line arguments.
+ *  @param argv The command line arguments.
+ */
 Application::Application(int argc, char * argv[])
 :	data(this),
 	fonts(this),
@@ -96,7 +100,7 @@ int Application::run()
 
 	if (exitCode == 0) init();
 	if (exitCode == 0) loop();
-	if (exitCode == 0) cleanup();
+	cleanup();
 
 	running = false;
 
@@ -107,6 +111,8 @@ int Application::run()
 	return exitCode;
 }
 
+/** Initializes the application. This includes loading resources, initializing the
+ *  graphics context, and setting up the GUI. */
 void Application::init()
 {
 	data.init();
@@ -175,8 +181,11 @@ void Application::init()
 
 	Game * game = new Game(*this);
 	pushState(game);
+	LOG(IMPORTANT, "Application::init() COMPLETED SUCCESSFULLY, Game state pushed.");
 }
 
+/** The main loop of the application. This function handles events, updates the
+ *  current state, and draws the GUI. */
 void Application::loop()
 {
 	sf::Clock clock;
@@ -224,15 +233,19 @@ void Application::loop()
 			if (event.type == sf::Event::KeyPressed) {
 				if (event.key.code == sf::Keyboard::Escape) {
 					exitCode = 1;
+					// Game * old = (Game *)states.top();
+					// old->quit();
 					continue;
 				}
 				if (event.key.code == sf::Keyboard::R && event.key.control) {
 					LOG(IMPORTANT, "reinitializing game");
-					Game * old = (Game *)states.top();
-					popState();
-					delete old;
-					Game * game = new Game(*this);
-					pushState(game);
+					if (!states.empty()) {
+						// popState() will now handle deactivating and deleting the current state.
+						popState();
+					}
+					// Create and push the new game state.
+					Game * new_game = new Game(*this);
+					pushState(new_game);
 					continue;
 				}
 #ifdef BUILD_DEBUG
@@ -302,13 +315,27 @@ void Application::loop()
 	}
 }
 
+/** Cleans up the application. This includes destroying the GUI, unloading resources,
+ *  and closing the graphics context. */
 void Application::cleanup()
 {
+	LOG(IMPORTANT, "Application::cleanup() ENTERED. States on stack: %zu", states.size());
 	while (!states.empty()) {
+		LOG(IMPORTANT, "Application::cleanup() - Popping a state (top is: %s).", typeid(*states.top()).name());
 		popState();
 	}
+	LOG(IMPORTANT, "Application::cleanup() - All states popped.");
+
+	if (rootGUI) {
+		LOG(IMPORTANT, "Application::cleanup() - Deleting rootGUI.");
+		delete rootGUI; // Deletes the GUI object, which releases its Rocket Context
+		rootGUI = nullptr;
+	}
+	// The GUIManager member (gui) will be destructed when Application is destructed.
+	// GUIManager's destructor should call Rocket::Core::Shutdown().
 
 	window.close();
+	LOG(IMPORTANT, "Application::cleanup() EXITED.");
 }
 
 /** Pushes the given State ontop of the state stack, causing it to receive events. */
@@ -329,8 +356,11 @@ void Application::popState()
 {
 	assert(!states.empty() && "popState() requires at least one state on the states stack");
 	LOG(INFO, "popping state %s", typeid(*states.top()).name());
-	states.top()->deactivate();
+	State* stateToPop = states.top();
+	stateToPop->deactivate();
 	states.pop();
+	delete stateToPop; // Ensure the popped state is deleted
+	stateToPop = nullptr;
 	if (!states.empty()) {
 		states.top()->activate();
 	}
