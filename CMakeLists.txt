@@ -51,6 +51,9 @@ file(GLOB_RECURSE sources RELATIVE ${PROJECT_SOURCE_DIR} source/*.cpp)
 include_directories(thirdparty/tinyxml2)
 list(APPEND sources thirdparty/tinyxml2/tinyxml2.cpp)
 
+if(POLICY CMP0072)
+  cmake_policy(SET CMP0072 OLD)
+endif()
 
 ###  PLATFORM-SPECIFIC STUFF
 ###  =======================
