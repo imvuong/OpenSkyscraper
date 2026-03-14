@@ -17,7 +17,7 @@ struct RatingRules {
 	/** Minimum number of Security offices required to reach 3 stars. */
 	static const int kRating3SecurityCount = 1;
 
-	/** Minimum population to reach 4 stars (from 3 stars). Simplified: no VIP. */
+	/** Minimum population to reach 4 stars (from 3 stars). Also requires 2+ hotel suites, recycling, medical, favorable VIP. */
 	static const int kRating4Population = 5000;
 	static const int kRating4HotelSuites = 2;
 

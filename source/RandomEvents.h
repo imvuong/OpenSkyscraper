@@ -12,6 +12,10 @@ public:
 	explicit RandomEvents(Game * game);
 	void advance(double dt);
 
+	// Called by Game when the player responds to a terrorist event prompt.
+	void onTerroristPayRansom();
+	void onTerroristDispatchSecurity();
+
 private:
 	Game * game;
 
@@ -21,10 +25,23 @@ private:
 	double vipDepartureTime;
 	int lastVipScheduleYear;
 
-	void tryScheduleVipVisit();
 	void onVipArrived();
 	void onVipLeft();
 	bool computeVipSatisfaction() const;
+
+	// One-shot / periodic random events.
+	bool goldDiscovered;
+	int lastSantaYear;
+
+	enum TerroristState { TerroristNone, TerroristAwaitChoice, TerroristSearching, TerroristResolved, TerroristExploded };
+	TerroristState terroristState;
+	double terroristDeadlineTime;
+	double terroristSearchEndTime;
+
+	void maybeTriggerGoldDiscovery();
+	void maybeTriggerSanta();
+	void maybeTriggerTerroristEvent();
+	void resolveTerroristSearch();
 };
 
 }

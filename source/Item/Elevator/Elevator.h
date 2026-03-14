@@ -69,6 +69,9 @@ namespace OT {
 				Car * getIdleCar(int floor);
 
 				void decideCarDestination(Car * car);
+
+				/** Clamps all car altitudes and destinations to the current shaft bounds (e.g. after resize or load). */
+				void constrainCarsToBounds();
 			};
 		}
 	}

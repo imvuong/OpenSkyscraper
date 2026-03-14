@@ -152,6 +152,7 @@ void Elevator::decodeXML(tinyxml2::XMLElement & xml)
 		car->decodeXML(*e);
 		cars.insert(car);
 	}
+	constrainCarsToBounds();
 	updateSprite();
 }
 
@@ -186,22 +187,15 @@ bool Elevator::repositionMotor(int motor, int y)
 	if (motor == -1) {
 		newy = (size.y + position.y - height);
 	}
+	// Enforce the global max above-ground floors limit when resizing elevators by dragging.
+	// (Placement already checks this, but dragging motors could otherwise extend above the cap.)
+	const int topFloor = newy + height - 1;
+	if (topFloor > RatingRules::kMaxFloorsAboveGround)
+		return false;
 	if (newy != position.y || height != size.y) {
 		setPosition(int2(position.x, newy));
 		size.y = height;
-		//TODO: constrain cars to stay within elevator bounds.
-		for (Cars::iterator c = cars.begin(); c != cars.end(); c++) {
-			Car * car = *c;
-			if (car->altitude < newy)				 car->altitude = newy;
-			else if (car->altitude >= newy + height) car->altitude = newy + height - 1;
-
-			if (car->destinationFloor < newy)				 car->destinationFloor = newy;
-			else if (car->destinationFloor >= newy + height) car->destinationFloor = newy + height - 1;
-
-			if (car->state == Car::kIdle) car->startAltitude = car->altitude;
-
-			(*c)->reposition();
-		}
+		constrainCarsToBounds();
 
 		int maxY = newy + height;
 		for (std::set<int>::iterator i = unservicedFloors.begin(); i != unservicedFloors.end();) {
@@ -272,6 +266,24 @@ Queue * Elevator::getQueue(int floor, Direction dir)
 	q->width     = 400;
 	queues.insert(q);
 	return q;
+}
+
+void Elevator::constrainCarsToBounds()
+{
+	const int minY = position.y;
+	const int maxY = position.y + size.y - 1;
+	for (Cars::iterator c = cars.begin(); c != cars.end(); c++) {
+		Car * car = *c;
+		if (car->altitude < minY)                  car->altitude = minY;
+		else if (car->altitude > maxY)              car->altitude = maxY;
+
+		if (car->destinationFloor < minY)          car->destinationFloor = minY;
+		else if (car->destinationFloor > maxY)      car->destinationFloor = maxY;
+
+		if (car->state == Car::kIdle) car->startAltitude = car->altitude;
+
+		(*c)->reposition();
+	}
 }
 
 /// Removes all queues on floors that the elevator doesn't connect to anymore. This is necessary

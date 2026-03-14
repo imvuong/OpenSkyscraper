@@ -19,6 +19,7 @@ void Condo::init()
 	updateLighting(game->time.getHour());
 	rent = 5000;
 	rentDeposit = rent;
+	maxOccupantStress = 0;
 
 	sprite.SetImage(App->bitmaps["simtower/condo"]);
 	sprite.setOrigin(0, 24);
@@ -42,11 +43,12 @@ void Condo::encodeXML(tinyxml2::XMLPrinter & xml)
 void Condo::decodeXML(tinyxml2::XMLElement & xml)
 {
 	Item::decodeXML(xml);
-	rent        = xml.IntAttribute("rent");
-	rentDeposit = xml.IntAttribute("rentDeposit");
-	variant     = xml.IntAttribute("variant");
-	lighting    = (LightingConditions)xml.IntAttribute("lighting");
-	occupied    = xml.BoolAttribute("occupied");
+	rent               = xml.IntAttribute("rent");
+	rentDeposit        = xml.IntAttribute("rentDeposit");
+	variant            = xml.IntAttribute("variant");
+	lighting           = (LightingConditions)xml.IntAttribute("lighting");
+	occupied           = xml.BoolAttribute("occupied");
+	maxOccupantStress  = 0;
 	updateSprite();
 }
 
@@ -104,9 +106,9 @@ void Condo::advance(double dt)
 	}
 
 	// Monday 5:00 needs special treatment as this is where rent will be paid and tenants vacate
-	// unattractive items.
+	// unattractive or high-stress items.
 	if (occupied && game->time.checkHour(5) && game->time.day == 0) {
-		// Vacate unattractive offices.
+		// Vacate unattractive condos or those where occupants endured excessive stress.
 		if (!isAttractive()) {
 			occupied = false;
 			removeOccupants();
@@ -114,11 +116,17 @@ void Condo::advance(double dt)
 			population = 0;
 			game->populationNeedsUpdate = true;
 			game->transferFunds(-rentDeposit, "Vacated Condo's rent deposit payed back");
-		}
-		//Pay rent for the others.
-		else {
+		} else if (maxOccupantStress >= 0.85) {
+			occupied = false;
+			removeOccupants();
+			spriteNeedsUpdate = true;
+			population = 0;
+			game->populationNeedsUpdate = true;
+			game->transferFunds(-rentDeposit, "Vacated Condo's rent deposit payed back");
+		} else {
 			game->transferFunds(rent, "Income from Condo's rent");
 		}
+		maxOccupantStress = 0;
 	}
 
 	if (occupied && game->time.checkHour(3)) {
@@ -202,6 +210,9 @@ bool Condo::updateLighting(double time)
 void Condo::addPerson(Person * p)
 {
 	Item::addPerson(p);
+	// Track peak return stress for stress-based vacating (SimTower-style).
+	if (p->stress > maxOccupantStress)
+		maxOccupantStress = p->stress;
 	spriteNeedsUpdate = true;
 }
 

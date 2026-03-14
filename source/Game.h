@@ -71,6 +71,7 @@ namespace OT {
 		void setRating(int r);
 		void setPopulation(int p);
 		void ratingMayIncrease();
+		void openTerroristEventDialog();
 
 		MapWindow     mapWindow;
 		ToolboxWindow toolboxWindow;
@@ -146,6 +147,8 @@ namespace OT {
 		Rocket::Core::ElementDocument * pauseMenuWindow;
 		Rocket::Core::ElementDocument * pauseQuitConfirmWindow;
 		int pauseMenuPrevSpeedMode;
+		Rocket::Core::ElementDocument * terroristEventWindow;
+		int terroristEventPrevSpeedMode;
 		bool dirty;
 		void showPauseMenu();
 		void hidePauseMenu();

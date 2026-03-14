@@ -51,6 +51,8 @@ Game::Game(Application & app)
 	pauseMenuWindow = NULL;
 	pauseQuitConfirmWindow = NULL;
 	pauseMenuPrevSpeedMode = 1;
+	terroristEventWindow = NULL;
+	terroristEventPrevSpeedMode = 1;
 	dirty = false;
 
 	mainLobby = NULL;
@@ -126,6 +128,11 @@ void Game::activate()
 
 void Game::deactivate()
 {
+	if (terroristEventWindow) {
+		terroristEventWindow->RemoveReference();
+		terroristEventWindow->Close();
+		terroristEventWindow = NULL;
+	}
 	if (pauseQuitConfirmWindow) {
 		pauseQuitConfirmWindow->RemoveReference();
 		pauseQuitConfirmWindow->Close();
@@ -234,9 +241,16 @@ bool Game::handleEvent(sf::Event & event)
 							constructionBlocked = true;
 							blockReason = "Only one Cathedral allowed.";
 						}
-						if (!constructionBlocked && (toolPosition.y <= 0 || toolPosition.y + toolPrototype->size.y - 1 < getTowerTopFloor())) {
+						if (!constructionBlocked) {
+							int top = getTowerTopFloor();
+							// Cathedral must be placed at the top of the current tower: it must overlap the current top floor.
+							// (Prevents placing it entirely above or below the existing tower top.)
+							if (toolPosition.y <= 0 ||
+							    toolPosition.y > top ||
+							    toolPosition.y + toolPrototype->size.y - 1 < top) {
 							constructionBlocked = true;
 							blockReason = "Cathedral must be built on the top of the tower.";
+							}
 						}
 					}
 
@@ -904,9 +918,13 @@ void Game::extendFloor(int floor, int minX, int maxX) {
 	}
 }
 
+/** Save format version on root <tower> element; increment when format changes to allow migration of old saves. */
+static const int kSaveFormatVersion = 1;
+
 void Game::encodeXML(tinyxml2::XMLPrinter & xml)
 {
 	xml.OpenElement("tower");
+	xml.PushAttribute("version", kSaveFormatVersion);
 	xml.PushAttribute("funds", funds);
 	xml.PushAttribute("rating", rating);
 	xml.PushAttribute("time", time.absolute);
@@ -932,6 +950,11 @@ void Game::decodeXML(tinyxml2::XMLDocument & xml)
 	tinyxml2::XMLElement * root = xml.RootElement();
 	assert(root);
 
+	// Version attribute optional for backward compatibility; 0 or missing => treat as 1.
+	int saveVersion = root->IntAttribute("version");
+	if (saveVersion == 0) saveVersion = 1;
+	(void)saveVersion; // reserved for future migration
+
 	setFunds(root->IntAttribute("funds"));
 	setRating(root->IntAttribute("rating"));
 	time.set(root->DoubleAttribute("time"));
@@ -955,9 +978,12 @@ void Game::decodeXML(tinyxml2::XMLDocument & xml)
 int Game::getTowerTopFloor() const
 {
 	int maxY = 0;
-	for (FloorItems::const_iterator it = floorItems.begin(); it != floorItems.end(); ++it)
-		if (it->first > maxY)
+	// "Top floor" is defined as the highest above-ground floor that has any built content.
+	// Use itemsByFloor so non-floor items (e.g. elevators, cathedral) count as content too.
+	for (ItemSetByInt::const_iterator it = itemsByFloor.begin(); it != itemsByFloor.end(); ++it) {
+		if (it->first > maxY && !it->second.empty())
 			maxY = it->first;
+	}
 	return maxY;
 }
 
@@ -1066,6 +1092,23 @@ void Game::ProcessEvent(Rocket::Core::Event & event)
 
 	const Rocket::Core::String & id = target->GetId();
 
+	if (terroristEventWindow) {
+		if (id == "terrorist_pay") {
+			terroristEventWindow->RemoveReference();
+			terroristEventWindow->Close();
+			terroristEventWindow = NULL;
+			setSpeedMode(terroristEventPrevSpeedMode);
+			randomEvents.onTerroristPayRansom();
+		} else if (id == "terrorist_security") {
+			terroristEventWindow->RemoveReference();
+			terroristEventWindow->Close();
+			terroristEventWindow = NULL;
+			setSpeedMode(terroristEventPrevSpeedMode);
+			randomEvents.onTerroristDispatchSecurity();
+		}
+		return;
+	}
+
 	if (pauseQuitConfirmWindow) {
 		if (id == "quit_yes") {
 			if (pauseQuitConfirmWindow) {
@@ -1120,6 +1163,28 @@ void Game::ProcessEvent(Rocket::Core::Event & event)
 	}
 }
 
+void Game::openTerroristEventDialog()
+{
+	if (terroristEventWindow) return;
+	// Do not stack on top of pause menu dialogs.
+	if (pauseMenuOpen || pauseQuitConfirmWindow) return;
+
+	terroristEventPrevSpeedMode = speedMode;
+	setSpeedMode(0);
+	terroristEventWindow = gui.loadDocument("terrorist_event.rml");
+	if (!terroristEventWindow) {
+		// Fail gracefully; fall back to automatic security dispatch.
+		setSpeedMode(terroristEventPrevSpeedMode);
+		randomEvents.onTerroristDispatchSecurity();
+		return;
+	}
+	terroristEventWindow->Show();
+	Rocket::Core::Element * pay = terroristEventWindow->GetElementById("terrorist_pay");
+	Rocket::Core::Element * sec = terroristEventWindow->GetElementById("terrorist_security");
+	if (pay) pay->AddEventListener("click", this);
+	if (sec) sec->AddEventListener("click", this);
+}
+
 void Game::transferFunds(int f, std::string message)
 {
 	setFunds(funds + f);
@@ -1146,9 +1211,12 @@ void Game::setRating(int r)
 		rating = r;
 		if (improved) {
 			LOG(IMPORTANT, "rating increased to %i", rating);
-			playOnce("simtower/rating/increased");
+			playOnce(rating == 5 ? "simtower/rating/tower" : "simtower/rating/increased");
 			char msg[64];
-			snprintf(msg, sizeof(msg), "Rating increased to %i!", rating);
+			if (rating == 5)
+				snprintf(msg, sizeof(msg), "Tower status achieved!");
+			else
+				snprintf(msg, sizeof(msg), "Rating increased to %i!", rating);
 			timeWindow.showMessage(msg);
 		}
 		timeWindow.updateRating();
@@ -1183,9 +1251,11 @@ void Game::ratingMayIncrease()
 
 	switch (rating) {
 		case 0: {
-			// 1 star -> 2 stars: 300 population (Security unlocks at 2 stars)
-			if (population >= RatingRules::kRating2Population)
+			// 1 star -> 2 stars: 300 population + at least one Security office
+			if (population >= RatingRules::kRating2Population && securityCount >= RatingRules::kRating2SecurityCount)
 				setRating(1);
+			else if (population >= RatingRules::kRating2Population)
+				timeWindow.showMessage("Your tower needs security.");
 		} break;
 		case 1: {
 			// 2 stars -> 3 stars: 1000 population + at least one Security office

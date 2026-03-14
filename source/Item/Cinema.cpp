@@ -5,6 +5,10 @@
 using namespace OT;
 using namespace OT::Item;
 
+namespace {
+	const int kRevenuePerCustomer = 500;
+	const int kOperatingCostPerScreening = 2000;
+}
 
 Cinema::~Cinema()
 {
@@ -58,7 +62,9 @@ void Cinema::updateSprite()
 			hallIndex = 3 + animationFrame;
 			screenIndex = 3 + movieType;
 		} else {
-			hallIndex = (people.size() > 0 ? 2 : 1); //TODO: make this based on the number of guests
+			// Hall sprite reflects occupancy: empty (1) vs has guests (2). More granular frames could use people.size() thresholds.
+			const int kHallEmpty = 1, kHallWithGuests = 2;
+			hallIndex = (people.size() > 0 ? kHallWithGuests : kHallEmpty);
 			screenIndex = hallIndex;
 		}
 	}
@@ -103,8 +109,8 @@ void Cinema::advance(double dt)
 		playing = false;
 		spriteNeedsUpdate = true;
 
-		//TODO: Specify cinema income.
-		game->transferFunds(customers.size() * 500 - 2000, "Income from Movie Theatre");
+		// Revenue when show completes: per-customer ticket income minus operating cost.
+		game->transferFunds((int)customers.size() * kRevenuePerCustomer - kOperatingCostPerScreening, "Income from Movie Theatre");
 
 		//Make the customers leave.
 		const Route &r = game->findRoute(this, game->mainLobby);

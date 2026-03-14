@@ -88,6 +88,8 @@ namespace OT {
 			int variant;
 			LightingConditions lighting;
 			bool occupied;
+			/** Peak stress seen when occupants returned home this week; used for stress-based vacating. */
+			double maxOccupantStress;
 
 			Sprite sprite;
 			bool spriteNeedsUpdate;

@@ -26,6 +26,7 @@ void Office::init()
 	lit = false;
 	rent = 10000;
 	rentDeposit = rent;
+	maxWorkerStress = 0;
 
 	sprite.SetImage(App->bitmaps["simtower/office"]);
 	sprite.setOrigin(0, 24);
@@ -64,11 +65,12 @@ void Office::encodeXML(tinyxml2::XMLPrinter & xml)
 void Office::decodeXML(tinyxml2::XMLElement & xml)
 {
 	Item::decodeXML(xml);
-	rent        = xml.IntAttribute("rent");
-	rentDeposit = xml.IntAttribute("rentDeposit");
-	variant     = xml.IntAttribute("variant");
-	occupied    = xml.BoolAttribute("occupied");
-	lit         = xml.BoolAttribute("lit");
+	rent            = xml.IntAttribute("rent");
+	rentDeposit     = xml.IntAttribute("rentDeposit");
+	variant         = xml.IntAttribute("variant");
+	occupied        = xml.BoolAttribute("occupied");
+	lit             = xml.BoolAttribute("lit");
+	maxWorkerStress = 0;
 	updateSprite();
 }
 
@@ -118,21 +120,25 @@ void Office::advance(double dt)
 	}
 
 	// Monday 5:00 needs special treatment as this is where rent will be paid and tenants vacate
-	// unattractive items.
+	// unattractive or high-stress items.
 	if (occupied && game->time.checkHour(5) && game->time.day == 0) {
-		// Vacate unattractive offices.
+		// Vacate unattractive offices or those where workers endured excessive stress.
 		if (!isAttractive()) {
 			occupied = false;
 			spriteNeedsUpdate = true;
 			population = 0;
 			game->populationNeedsUpdate = true;
 			game->transferFunds(-rentDeposit, "Vacated Office's rent deposit payed back");
-		}
-
-		//Pay rent for the others.
-		else {
+		} else if (maxWorkerStress >= 0.85) {
+			occupied = false;
+			spriteNeedsUpdate = true;
+			population = 0;
+			game->populationNeedsUpdate = true;
+			game->transferFunds(-rentDeposit, "Vacated Office's rent deposit payed back");
+		} else {
 			game->transferFunds(rent, "Income from Office rent");
 		}
+		maxWorkerStress = 0;
 	}
 
 	// Reset worker schedules at 5:00 if the office is occupied.
@@ -233,6 +239,9 @@ void Office::addPerson(Person * p)
 {
 	Item::addPerson(p);
 
+	// Track peak arrival stress for stress-based vacating (SimTower-style).
+	if (p->stress > maxWorkerStress)
+		maxWorkerStress = p->stress;
 	//Reduce the person's stress a bit, just for the time being.
 	p->stress *= 0.5;
 

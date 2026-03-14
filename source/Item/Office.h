@@ -97,6 +97,8 @@ namespace OT {
 			bool occupied;
 			int variant;
 			bool lit;
+			/** Peak stress seen when workers arrived this week; used for stress-based vacating. */
+			double maxWorkerStress;
 
 			Sprite sprite;
 			bool spriteNeedsUpdate;
