@@ -72,6 +72,24 @@ void Office::decodeXML(tinyxml2::XMLElement & xml)
 	updateSprite();
 }
 
+void Office::updateRoutes()
+{
+	Item::updateRoutes();
+	parkingRoute.clear();
+	const char * parkingTypes[] = { "ramp", "space" };
+	for (int t = 0; t < 2; t++) {
+		Game::ItemSetByString::const_iterator it = game->itemsByType.find(parkingTypes[t]);
+		if (it == game->itemsByType.end()) continue;
+		for (Game::ItemSet::const_iterator i = it->second.begin(); i != it->second.end(); i++) {
+			Route r = game->findRoute(*i, this);
+			if (!r.empty()) {
+				parkingRoute = r;
+				return;
+			}
+		}
+	}
+}
+
 void Office::updateSprite()
 {
 	spriteNeedsUpdate = false;
@@ -124,12 +142,14 @@ void Office::advance(double dt)
 
 	// Animate workers if occupied.
 	if (occupied) {
-		// Make workers arrive.
+		// Make workers arrive (by lobby or by car / parking).
 		while (!arrivalQueue.empty()) {
 			Worker * c = arrivalQueue.top();
-			if (game->time.hour > c->arrivalTime && !lobbyRoute.empty()) {
+			bool useParking = !parkingRoute.empty() && (rand() % 10 < 3);
+			Route & arrivalRoute = (useParking ? parkingRoute : lobbyRoute);
+			if (game->time.hour > c->arrivalTime && !arrivalRoute.empty()) {
 				arrivalQueue.pop();
-				c->journey.set(lobbyRoute);
+				c->journey.set(arrivalRoute);
 			} else break;
 		}
 
@@ -172,6 +192,24 @@ void Office::advance(double dt)
 				LOG(DEBUG, "Calling back salesman %p", w);
 				w->journey.set(lobbyRoute);
 			} else break;
+		}
+
+		// Send workers to lunch at a FastFood when their lunch time has passed.
+		while (!lunchQueue.empty()) {
+			Worker *w = lunchQueue.top();
+			if (game->time.hour < w->lunchTime) break;
+			lunchQueue.pop();
+			Game::ItemSetByString::const_iterator it = game->itemsByType.find("fastfood");
+			if (it != game->itemsByType.end()) {
+				for (Game::ItemSet::const_iterator ff = it->second.begin(); ff != it->second.end(); ++ff) {
+					Route r = game->findRoute(this, *ff);
+					if (!r.empty()) {
+						w->journey.set(r);
+						LOG(DEBUG, "Worker %p leaving for lunch", w);
+						break;
+					}
+				}
+			}
 		}
 	}
 
