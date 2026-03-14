@@ -2,6 +2,14 @@
 	<head>
 		<style>
 			body {
+				position: absolute;
+				top: 0;
+				left: 0;
+				right: 0;
+				bottom: 0;
+			}
+			div#menu-box {
+				position: absolute;
 				top: 50%;
 				left: 50%;
 				width: 280px;
@@ -39,11 +47,13 @@
 		</style>
 	</head>
 	<body>
-		<h1>OpenSkyscraper</h1>
-		<button id="newgame">New Game</button>
-		<button id="load1">Load Slot 1</button>
-		<button id="load2">Load Slot 2</button>
-		<button id="load3">Load Slot 3</button>
-		<button id="quit">Quit</button>
+		<div id="menu-box">
+			<h1>OpenSkyscraper</h1>
+			<button id="newgame">New Game</button>
+			<button id="load1">Load Slot 1</button>
+			<button id="load2">Load Slot 2</button>
+			<button id="load3">Load Slot 3</button>
+			<button id="quit">Quit</button>
+		</div>
 	</body>
 </rml>
