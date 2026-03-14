@@ -78,19 +78,24 @@ void Factory::loadPrototypes()
 	}
 }
 
-OT::Item::Item * Factory::make(AbstractPrototype * prototype, int2 position)
+OT::Item::Item * Factory::make(AbstractPrototype * prototype, int2 position, bool lobbyHigh)
 {
 	assert(prototype);
 	Item * item = prototype->make(game);
 	item->setPosition(position);
+	if (lobbyHigh && prototype->icon == ICON_LOBBY) {
+		Lobby * l = (Lobby *) item;
+		l->highLobby = true;
+		l->size.y = 3;  // High lobby occupies 3 floors so floors 1–2 exist and building on floor 3 works
+	}
 	item->init();
 	return item;
 }
 
-OT::Item::Item * Factory::make(std::string prototypeID, int2 position)
+OT::Item::Item * Factory::make(std::string prototypeID, int2 position, bool lobbyHigh)
 {
 	AbstractPrototype * prototype = prototypesById[prototypeID];
-	return make(prototype, position);
+	return make(prototype, position, lobbyHigh);
 }
 
 OT::Item::Item * Factory::make(tinyxml2::XMLElement & xml)

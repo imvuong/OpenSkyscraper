@@ -396,6 +396,9 @@ bool Game::handleEvent(sf::Event & event)
 							for (ItemSet::const_iterator ii = itemsNearby.begin(); !constructionBlocked && ii != itemsNearby.end(); ii++) {
 								Item::Item * i = *ii;
 								if (i->canHaulPeople()) continue;
+								// Lobby does not block when building entirely above it (e.g. floor above high lobby)
+								if (i->prototype->icon == ICON_LOBBY && toolBoundary.minY() >= i->getRect().maxY())
+									continue;
 								if (toolBoundary.intersectsRect(i->getRect())) {
 									constructionBlocked = true;
 									blockReason = i->prototype->name + " is in the way";
@@ -405,10 +408,16 @@ bool Game::handleEvent(sf::Event & event)
 
 						// Check floor width below/above if constructing above/below ground level
 						Item::Item * i = NULL;
-						if (toolPosition.y > 0 && floorItems.count(toolPosition.y - 1) != 0)
+						// First floor above high lobby (y == lobby top): always use main lobby extent so 4th floor is buildable
+						if (toolPosition.y > 0 && mainLobby && toolPosition.y == mainLobby->position.y + mainLobby->size.y)
+							i = mainLobby;
+						else if (toolPosition.y > 0 && floorItems.count(toolPosition.y - 1) != 0)
 							i = floorItems[toolPosition.y - 1];
 						else if (floorItems.count(toolPosition.y + toolPrototype->size.y) != 0)
 							i = floorItems[toolPosition.y + toolPrototype->size.y];
+						// Fallback: no floor below; use main lobby extent so building can proceed
+						if (!i && toolPosition.y > 0 && mainLobby)
+							i = mainLobby;
 						if (i) {
 							minFloorX = i->position.x;
 							maxFloorX = i->getRect().maxX();
@@ -422,6 +431,13 @@ bool Game::handleEvent(sf::Event & event)
 
 					if (!constructionBlocked) {
 						LOG(DEBUG, "construct %s at %ix%i, size %ix%i", toolPrototype->id.c_str(), toolPosition.x, toolPosition.y, toolPrototype->size.x, toolPrototype->size.y);
+
+						// If building above ground with no floor below (e.g. first floor above high lobby), create missing floors first
+						if (toolPosition.y > 0 && floorItems.count(toolPosition.y - 1) == 0 && mainLobby) {
+							int mx = mainLobby->position.x, mw = mainLobby->getRect().maxX() - mx;
+							for (int f = mainLobby->position.y + mainLobby->size.y; f < toolPosition.y; f++)
+								extendFloor(f, mx, mx + mw);
+						}
 
 						// Construct floors
 						for (int i = 0; i < toolPrototype->size.y; i++)
@@ -458,7 +474,13 @@ bool Game::handleEvent(sf::Event & event)
 							}
 							// Otherwise construct a new lobby
 							if (!existingLobby) {
-								Item::Item * item = itemFactory.make(toolPrototype, toolPosition);
+								bool highLobby = (toolPosition.y == 0 && (sf::Keyboard::isKeyPressed(sf::Keyboard::LShift) || sf::Keyboard::isKeyPressed(sf::Keyboard::RShift)));
+								if (highLobby) {
+									// High lobby occupies 3 floors; create floors 1 and 2 so building on floor 3 works
+									for (int i = 1; i < 3; i++)
+										extendFloor(toolPosition.y + i, toolPosition.x, toolPosition.x + toolPrototype->size.x);
+								}
+								Item::Item * item = itemFactory.make(toolPrototype, toolPosition, highLobby);
 								LOG(INFO, "created new lobby item %p", item);
 								addItem(item);
 								item->constructionTimer = 3.0;

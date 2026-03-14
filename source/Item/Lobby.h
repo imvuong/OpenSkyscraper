@@ -22,6 +22,9 @@ namespace OT {
 			virtual void encodeXML(tinyxml2::XMLPrinter & xml);
 			virtual void decodeXML(tinyxml2::XMLElement & xml);
 
+			/** When true and at ground floor (y==0), use the tall "high lobby" sprite (Shift when placing). */
+			bool highLobby = false;
+
 			Sprite background;
 			Sprite overlay;
 			Sprite entrances[2];

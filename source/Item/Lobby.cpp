@@ -16,13 +16,14 @@ void Lobby::init() {
 	bool groundLobby = (position.y == 0);
 	LOG(INFO, "init lobby positioned at {%d %d} by {%d %d}", position.x, position.y, size.x, size.y);
 
-	Path p = (groundLobby ? "simtower/lobby/normal" : "simtower/lobby/sky");
+	Path p = (groundLobby && highLobby) ? "simtower/lobby/high" : (groundLobby ? "simtower/lobby/normal" : "simtower/lobby/sky");
+	int tierHeight = (groundLobby && highLobby) ? 108 : 36;
 
 	background.SetImage(App->bitmaps[p]);
-	background.setOrigin(0, 36);
+	background.setOrigin(0, tierHeight);
 
 	overlay.SetImage(App->bitmaps[p]);
-	overlay.setOrigin(0, 36);
+	overlay.setOrigin(0, tierHeight);
 	// overlay = background;
 
 	if (groundLobby) {
@@ -43,11 +44,26 @@ void Lobby::init() {
 void Lobby::encodeXML(tinyxml2::XMLPrinter & xml) {
 	Item::encodeXML(xml);
 	xml.PushAttribute("width", size.x);
+	if (highLobby) xml.PushAttribute("high", 1);
 }
 
 void Lobby::decodeXML(tinyxml2::XMLElement & xml) {
 	Item::decodeXML(xml);
 	size.x = xml.IntAttribute("width");
+	{
+		int h = 0;
+		xml.QueryIntAttribute("high", &h);
+		highLobby = (h != 0);
+		if (highLobby) size.y = 3;  // High lobby occupies 3 floors
+	}
+	// Re-apply lobby visuals when loading high lobby (init() ran before decodeXML)
+	if (position.y == 0 && highLobby) {
+		Path p = "simtower/lobby/high";
+		background.SetImage(App->bitmaps[p]);
+		background.setOrigin(0, 108);
+		overlay.SetImage(App->bitmaps[p]);
+		overlay.setOrigin(0, 108);
+	}
 	updateSprite();
 }
 
@@ -56,8 +72,9 @@ void Lobby::updateSprite() {
 	if (game->rating == 2) y = 1;
 	if (game->rating >= 3) y = 2;
 
-	overlay.setTextureRect(sf::IntRect(0, y*36, 56, 36));
-	background.setTextureRect(sf::IntRect(56, y*36, 256, 36));
+	int tierHeight = (position.y == 0 && highLobby) ? 108 : 36;
+	overlay.setTextureRect(sf::IntRect(0, y*tierHeight, 56, tierHeight));
+	background.setTextureRect(sf::IntRect(56, y*tierHeight, 256, tierHeight));
 
 	entrances[0].setPosition(getRect().minX()*8, 0);
 	entrances[1].setPosition(getRect().maxX()*8, 0);
