@@ -152,8 +152,11 @@ void Sky::render(sf::RenderTarget & target) const
 	//Draw the clouds.
 	Sprite cloud;
 	int2 cloudGrid(250, 100);
-	int2 cmin(floor(dmin.x / cloudGrid.x)-1, floor(-dmax.y / cloudGrid.y)-1);
-	int2 cmax(ceil(dmax.x / cloudGrid.x)+1, ceil(-dmin.y / cloudGrid.y)+1);
+	// Account for cloud scroll: visible x range in grid is (dmin - cloudOffsetX, dmax - cloudOffsetX).
+	int cmin_x = (int)floor((dmin.x - cloudOffsetX - 60) / cloudGrid.x) - 1;
+	int cmax_x = (int)ceil((dmax.x - cloudOffsetX + 60) / cloudGrid.x) + 1;
+	int2 cmin(cmin_x, (int)floor(-dmax.y / cloudGrid.y)-1);
+	int2 cmax(cmax_x, (int)ceil(-dmin.y / cloudGrid.y)+1);
 	if (cmin.y < 2) cmin.y = 2;
 	for (int x = cmin.x; x <= cmax.x; x++) {
 		for (int y = cmin.y; y <= cmax.y; y++) {
@@ -172,7 +175,9 @@ void Sky::render(sf::RenderTarget & target) const
 
 			//Introduce some jitter so the clouds don't look like they're on a grid.
 			double2 jitterOffset(cloudNoise(noiseInputPositionBase * 941), cloudNoise(noiseInputPositionBase * 786));
-			int2 finalPosition = position + int2(jitterOffset.x * 50, jitterOffset.y * 50);
+			// Use sub-pixel position including cloudOffsetX so clouds scroll smoothly (original only shifted the noise pattern).
+			float drawX = (float)(position.x + jitterOffset.x * 50 + cloudOffsetX);
+			float drawY = (float)(position.y + jitterOffset.y * 50);
 
 			char c[128];
 			snprintf(c, 128, "simtower/deco/cloud/%i", abs(variant)%4);
@@ -189,7 +194,7 @@ void Sky::render(sf::RenderTarget & target) const
 				// cloud.setScale(w, h);
 				cloud.setOrigin(w/2, h/2);
 				cloud.setColor(sf::Color(255, 255, 255, (sf::Uint8)(255 * (i == 0 ? 1.0f : (float)progress))));
-				cloud.setPosition(finalPosition.x, finalPosition.y);
+				cloud.setPosition(drawX, drawY);
 				target.draw(cloud);
 				game->drawnSprites++;
 			}
