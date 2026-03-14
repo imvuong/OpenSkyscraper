@@ -1,9 +1,14 @@
 /* Copyright (c) 2012-2015 Fabian Schuiki */
 #include <cassert>
+#include <cstdio>
+#include <string>
+#include <sys/stat.h>
+
 #include "Application.h"
 #include "Game.h"
 #include "Item/Lobby.h"
 #include "OpenGL.h"
+#include "RatingRules.h"
 
 #ifdef _WIN32
 #include "Math/Round.h"
@@ -15,17 +20,19 @@ Game::Game(Application & app)
 :	State("game"),
 	app(app),
 	itemFactory(this),
+	mapWindow(this),
 	toolboxWindow(this),
 	timeWindow(this),
 	sky(this),
-	decorations(this)
+	decorations(this),
+	randomEvents(this)
 {
-	mapWindow     = NULL;
 
 	funds  = 4000000;
 	rating = 0;
 	population = 0;
 	populationNeedsUpdate = false;
+	favorableVipVisit = false;
 
 	time.set(7/78.0);
 	speedMode = 1;
@@ -39,6 +46,12 @@ Game::Game(Application & app)
 
 	draggingElevator = NULL;
 	draggingMotor = 0;
+
+	pauseMenuOpen = false;
+	pauseMenuWindow = NULL;
+	pauseQuitConfirmWindow = NULL;
+	pauseMenuPrevSpeedMode = 1;
+	dirty = false;
 
 	mainLobby = NULL;
 	metroStation = NULL;
@@ -113,11 +126,22 @@ void Game::activate()
 
 void Game::deactivate()
 {
+	if (pauseQuitConfirmWindow) {
+		pauseQuitConfirmWindow->RemoveReference();
+		pauseQuitConfirmWindow->Close();
+		pauseQuitConfirmWindow = NULL;
+	}
+	if (pauseMenuOpen) hidePauseMenu();
 	State::deactivate();
 }
 
 bool Game::handleEvent(sf::Event & event)
 {
+	if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Escape) {
+		if (pauseMenuOpen) hidePauseMenu();
+		else showPauseMenu();
+		return true;
+	}
 	switch (event.type) {
 		case sf::Event::KeyPressed: {
 			switch (event.key.code) {
@@ -126,13 +150,8 @@ bool Game::handleEvent(sf::Event & event)
 				case sf::Keyboard::Up:    poi.y += 20; return true;
 				case sf::Keyboard::Down:  poi.y -= 20; return true;
 				case sf::Keyboard::F1:    reloadGUI(); return true;
-				case sf::Keyboard::F3:    setRating(1); return true;
-				case sf::Keyboard::F2: {
-					FILE * f = fopen("default.tower", "w");
-					tinyxml2::XMLPrinter xml(f);
-					encodeXML(xml);
-					fclose(f);
-				} return true;
+				case sf::Keyboard::F2: saveToFile(getSavePath()); return true;
+				case sf::Keyboard::F3: loadFromFile(getSavePath()); return true;
 				case sf::Keyboard::PageUp:   zoom /= 2; return true;
 				case sf::Keyboard::PageDown: zoom *= 2; return true;
 			}
@@ -151,7 +170,7 @@ bool Game::handleEvent(sf::Event & event)
 			float2 mousePoint(event.mouseButton.x, event.mouseButton.y);
 			rectf toolboxWindowRect(float2(toolboxWindow.window->GetAbsoluteLeft(), toolboxWindow.window->GetAbsoluteTop()), float2(toolboxWindow.window->GetClientWidth(), toolboxWindow.window->GetClientHeight()));
 			rectf timeWindowRect(float2(timeWindow.window->GetAbsoluteLeft(), timeWindow.window->GetAbsoluteTop()), float2(timeWindow.window->GetClientWidth(), timeWindow.window->GetClientHeight()));
-			rectf mapWindowRect(float2(mapWindow->GetAbsoluteLeft(), mapWindow->GetAbsoluteTop()), float2(mapWindow->GetClientWidth(), mapWindow->GetClientHeight()));
+			rectf mapWindowRect(mapWindow.window ? float2(mapWindow.window->GetAbsoluteLeft(), mapWindow.window->GetAbsoluteTop()) : float2(0,0), mapWindow.window ? float2(mapWindow.window->GetClientWidth(), mapWindow.window->GetClientHeight()) : float2(0,0));
 
 			// Prevent construction or triggering of tool if mouse cursor within toolboxWindow
 			if (toolboxWindowRect.containsPoint(mousePoint)) break;
@@ -160,7 +179,7 @@ bool Game::handleEvent(sf::Event & event)
 			if (timeWindowRect.containsPoint(mousePoint)) break;
 
 			// Prevent construction or triggering of tool if mouse cursor within mapWindow
-			if (mapWindowRect.containsPoint(mousePoint)) {
+			if (mapWindow.window && mapWindowRect.containsPoint(mousePoint)) {
 				break;	// Break for now, may add code to handle viewport shift in future
 			}
 
@@ -177,9 +196,12 @@ bool Game::handleEvent(sf::Event & event)
 							toolBoundary.minY() >= itemRect.minY() &&
 							toolBoundary.maxY() <= itemRect.maxY()) {
 							LOG(DEBUG, "add car on floor %i to elevator %s", toolPosition.y, e->desc().c_str());
-							e->addCar(toolPosition.y);
-							transferFunds(-80000);
-							handled = true;
+							if (e->addCar(toolPosition.y)) {
+								transferFunds(-80000);
+								handled = true;
+							} else {
+								timeWindow.showMessage("Maximum 8 cars per elevator.");
+							}
 							break;
 						}
 					}
@@ -190,7 +212,35 @@ bool Game::handleEvent(sf::Event & event)
 					int minFloorX = INT_MAX;
 					int maxFloorX = INT_MIN;
 
-					if (toolPosition.y < -9 && toolPrototype->icon != ICON_METRO) {
+					if (toolPrototype->minRating > rating) {
+						constructionBlocked = true;
+						char buf[64];
+						snprintf(buf, sizeof(buf), "Unlocks at %d stars.", toolPrototype->minRating + 1);
+						blockReason = buf;
+					}
+
+					if (toolPosition.y > 0 && toolPosition.y + toolPrototype->size.y - 1 > RatingRules::kMaxFloorsAboveGround) {
+						constructionBlocked = true;
+						blockReason = "Maximum " + std::to_string(RatingRules::kMaxFloorsAboveGround) + " floors above ground.";
+					}
+
+					if (toolPrototype->id.find("elevator") == 0 && itemsByType["elevator"].size() >= (size_t)RatingRules::kMaxElevatorShafts) {
+						constructionBlocked = true;
+						blockReason = "Maximum " + std::to_string(RatingRules::kMaxElevatorShafts) + " elevator shafts.";
+					}
+
+					if (toolPrototype->id == "cathedral") {
+						if (itemsByType.count("cathedral") != 0 && !itemsByType["cathedral"].empty()) {
+							constructionBlocked = true;
+							blockReason = "Only one Cathedral allowed.";
+						}
+						if (!constructionBlocked && (toolPosition.y <= 0 || toolPosition.y + toolPrototype->size.y - 1 < getTowerTopFloor())) {
+							constructionBlocked = true;
+							blockReason = "Cathedral must be built on the top of the tower.";
+						}
+					}
+
+					if (toolPosition.y < -9 && toolPrototype->icon != ICON_METRO && toolPrototype->icon != ICON_CINEMA) {
 						constructionBlocked = true;
 						blockReason = "Cannot build below floor B9";
 					}
@@ -198,6 +248,11 @@ bool Game::handleEvent(sf::Event & event)
 					if (toolPosition.y > 0 && toolPrototype->icon == ICON_METRO) {
 						constructionBlocked = true;
 						blockReason = toolPrototype->name + " unavailable above ground";
+					}
+
+					if (metroStation && toolPosition.y < 0 && toolPrototype->icon != ICON_METRO && toolPosition.y < metroStation->position.y) {
+						constructionBlocked = true;
+						blockReason = "Cannot build below Metro";
 					}
 
 					if (toolPrototype->icon == ICON_LOBBY) {
@@ -392,18 +447,22 @@ bool Game::handleEvent(sf::Event & event)
 								Item::Item * item = itemFactory.make(toolPrototype, toolPosition);
 								LOG(INFO, "created new lobby item %p", item);
 								addItem(item);
+								item->constructionTimer = 3.0;
 								transferFunds(-toolPrototype->price);
 								playOnce("simtower/construction/normal");
 							}
 						} else if (toolPrototype->icon != ICON_FLOOR) {
 							Item::Item * item = itemFactory.make(toolPrototype, toolPosition);
 							addItem(item);
+							item->constructionTimer = 3.0;
 							transferFunds(-toolPrototype->price);
 							if (item->canHaulPeople()) {
 								if (item->isElevator()) selectTool("finger");
 								updateRoutes();
 							} else
 								item->updateRoutes();
+							if (toolPrototype->id == "cathedral")
+								ratingMayIncrease();
 							playOnce("simtower/construction/normal");
 						}
 					} else {
@@ -506,15 +565,23 @@ void Game::advance(double dt)
 	sf::RenderWindow & win = app.window;
 	drawnSprites = 0;
 
+	// When paused (speedMode 0), simulation does not advance: time and all items get dt=0.
+	const double effectiveDt = (speedMode == 0) ? 0.0 : dt;
+
 	//Advance time.
-	time.advance(dt);
+	time.advance(effectiveDt);
 	timeWindow.updateTime();
 
-	timeWindow.advance(dt);
-	sky.advance(dt);
+	timeWindow.advance(effectiveDt);
+	sky.advance(effectiveDt);
+	randomEvents.advance(effectiveDt);
 
 	for (ItemSet::iterator i = items.begin(); i != items.end(); i++) {
-		(*i)->advance(dt);
+		if ((*i)->constructionTimer > 0) {
+			(*i)->constructionTimer -= effectiveDt;
+			if ((*i)->constructionTimer < 0) (*i)->constructionTimer = 0;
+		}
+		(*i)->advance(effectiveDt);
 	}
 
 	if (populationNeedsUpdate) {
@@ -684,15 +751,7 @@ void Game::advance(double dt)
 
 void Game::reloadGUI()
 {
-	if (mapWindow) {
-		mapWindow->RemoveReference();
-		mapWindow->Close();
-	}
-
-	mapWindow     = gui.loadDocument("map.rml");
-
-	if (mapWindow)     mapWindow    ->Show();
-
+	mapWindow.reload();
 	toolboxWindow.reload();
 	timeWindow.reload();
 }
@@ -763,6 +822,7 @@ void Game::addItem(Item::Item * item)
 	gameMap.addNode(MapNode::Point(item->position.x + item->size.x/2, item->position.y), item);
 	decorations.updateCrane();
 	if (item == metroStation) decorations.updateTracks();
+	dirty = true;
 }
 
 void Game::removeItem(Item::Item * item)
@@ -797,9 +857,12 @@ void Game::removeItem(Item::Item * item)
 	gameMap.removeNode(MapNode::Point(item->position.x + item->size.x/2, item->position.y), item);
 	decorations.updateCrane();
 	if (item->prototype->icon == ICON_METRO) decorations.updateTracks(); // Technically, this should not happen as Metro Stations are not removable.
+	dirty = true;
 }
 
 void Game::extendFloor(int floor, int minX, int maxX) {
+	if (floor > RatingRules::kMaxFloorsAboveGround)
+		return;
 	if (floorItems.count(floor) != 0) {
 		// Look for existing floor to extend
 		Item::Floor * f = floorItems[floor];
@@ -853,6 +916,7 @@ void Game::encodeXML(tinyxml2::XMLPrinter & xml)
 
 	xml.PushAttribute("x", (int)poi.x);
 	xml.PushAttribute("y", (int)poi.y);
+	xml.PushAttribute("favorableVipVisit", favorableVipVisit);
 
 	for (ItemSet::iterator i = items.begin(); i != items.end(); i++) {
 		xml.OpenElement("item");
@@ -877,6 +941,7 @@ void Game::decodeXML(tinyxml2::XMLDocument & xml)
 
 	poi.x = root->IntAttribute("x");
 	poi.y = root->IntAttribute("y");
+	favorableVipVisit = root->BoolAttribute("favorableVipVisit");
 
 	tinyxml2::XMLElement * e = root->FirstChildElement("item");
 	while (e) {
@@ -885,6 +950,174 @@ void Game::decodeXML(tinyxml2::XMLDocument & xml)
 		e = e->NextSiblingElement("item");
 	}
 	updateRoutes();
+}
+
+int Game::getTowerTopFloor() const
+{
+	int maxY = 0;
+	for (FloorItems::const_iterator it = floorItems.begin(); it != floorItems.end(); ++it)
+		if (it->first > maxY)
+			maxY = it->first;
+	return maxY;
+}
+
+bool Game::isTowerFullyDeveloped() const
+{
+	int top = getTowerTopFloor();
+	if (top <= 0) return true;
+	for (int f = 1; f <= top; f++) {
+		if (floorItems.count(f) == 0)
+			return false;
+	}
+	return true;
+}
+
+Path Game::getSavePath() const
+{
+	return getSavePathForSlot(1);
+}
+
+Path Game::getSavePathForSlot(int slot) const
+{
+	const char * name = (slot == 2) ? "saves/slot2.tower" : (slot == 3) ? "saves/slot3.tower" : "saves/default.tower";
+	DataManager::Paths p = app.data.paths(name);
+	if (p.empty()) return Path(slot == 2 ? "slot2.tower" : slot == 3 ? "slot3.tower" : "default.tower");
+	Path path = p[0];
+	Path saveDir = path.up();
+	struct stat st;
+	if (stat(saveDir.c_str(), &st) != 0) {
+		mkdir(saveDir.c_str(), 0777);
+	}
+	return path;
+}
+
+bool Game::saveToFile(Path path)
+{
+	FILE * f = fopen(path.c_str(), "w");
+	if (!f) return false;
+	tinyxml2::XMLPrinter xml(f);
+	encodeXML(xml);
+	fclose(f);
+	dirty = false;
+	return true;
+}
+
+void Game::clearState()
+{
+	mainLobby = NULL;
+	metroStation = NULL;
+	while (!items.empty()) {
+		Item::Item * it = *items.begin();
+		removeItem(it);
+		delete it;
+	}
+}
+
+bool Game::loadFromFile(Path path)
+{
+	tinyxml2::XMLDocument xml;
+	if (xml.LoadFile(path.c_str()) != tinyxml2::XML_SUCCESS) return false;
+	clearState();
+	decodeXML(xml);
+	dirty = false;
+	return true;
+}
+
+void Game::showPauseMenu()
+{
+	if (pauseMenuWindow) return;
+	pauseMenuPrevSpeedMode = speedMode;
+	setSpeedMode(0);
+	pauseMenuOpen = true;
+	pauseMenuWindow = gui.loadDocument("pause.rml");
+	if (pauseMenuWindow) {
+		pauseMenuWindow->Show();
+		Rocket::Core::Element * resume = pauseMenuWindow->GetElementById("resume");
+		for (const char * id : {"save1", "save2", "save3", "load1", "load2", "load3", "quit"}) {
+			Rocket::Core::Element * el = pauseMenuWindow->GetElementById(id);
+			if (el) el->AddEventListener("click", this);
+		}
+		if (resume) resume->AddEventListener("click", this);
+	}
+	pauseQuitConfirmWindow = NULL;
+}
+
+void Game::hidePauseMenu()
+{
+	if (pauseQuitConfirmWindow) {
+		pauseQuitConfirmWindow->RemoveReference();
+		pauseQuitConfirmWindow->Close();
+		pauseQuitConfirmWindow = NULL;
+	}
+	if (!pauseMenuWindow) return;
+	pauseMenuOpen = false;
+	pauseMenuWindow->RemoveReference();
+	pauseMenuWindow->Close();
+	pauseMenuWindow = NULL;
+	setSpeedMode(pauseMenuPrevSpeedMode);
+}
+
+void Game::ProcessEvent(Rocket::Core::Event & event)
+{
+	if (event.GetType() != "click") return;
+	Rocket::Core::Element * target = event.GetTargetElement();
+	while (target && target->GetId().Empty()) target = target->GetParentNode();
+	if (!target) return;
+
+	const Rocket::Core::String & id = target->GetId();
+
+	if (pauseQuitConfirmWindow) {
+		if (id == "quit_yes") {
+			if (pauseQuitConfirmWindow) {
+				pauseQuitConfirmWindow->RemoveReference();
+				pauseQuitConfirmWindow->Close();
+				pauseQuitConfirmWindow = NULL;
+			}
+			hidePauseMenu();
+			app.requestQuitToMenu();
+		} else if (id == "quit_no") {
+			if (pauseQuitConfirmWindow) {
+				pauseQuitConfirmWindow->RemoveReference();
+				pauseQuitConfirmWindow->Close();
+				pauseQuitConfirmWindow = NULL;
+			}
+		}
+		return;
+	}
+
+	if (!pauseMenuWindow) return;
+	if (id == "resume") {
+		hidePauseMenu();
+	} else if (id == "save1" || id == "save2" || id == "save3") {
+		int slot = (id == "save1") ? 1 : (id == "save2") ? 2 : 3;
+		if (saveToFile(getSavePathForSlot(slot))) {
+			char msg[32];
+			snprintf(msg, sizeof(msg), "Saved to slot %i.", slot);
+			timeWindow.showMessage(msg);
+		}
+	} else if (id == "load1" || id == "load2" || id == "load3") {
+		int slot = (id == "load1") ? 1 : (id == "load2") ? 2 : 3;
+		if (loadFromFile(getSavePathForSlot(slot))) {
+			hidePauseMenu();
+			char msg[32];
+			snprintf(msg, sizeof(msg), "Loaded slot %i.", slot);
+			timeWindow.showMessage(msg);
+		}
+	} else if (id == "quit") {
+		if (dirty) {
+			pauseQuitConfirmWindow = gui.loadDocument("pause_quit_confirm.rml");
+			if (pauseQuitConfirmWindow) {
+				pauseQuitConfirmWindow->Show();
+				Rocket::Core::Element * yes = pauseQuitConfirmWindow->GetElementById("quit_yes");
+				Rocket::Core::Element * no = pauseQuitConfirmWindow->GetElementById("quit_no");
+				if (yes) yes->AddEventListener("click", this);
+				if (no) no->AddEventListener("click", this);
+			}
+		} else {
+			hidePauseMenu();
+			app.requestQuitToMenu();
+		}
+	}
 }
 
 void Game::transferFunds(int f, std::string message)
@@ -912,11 +1145,14 @@ void Game::setRating(int r)
 		bool improved = (r > rating);
 		rating = r;
 		if (improved) {
-			//TODO: show window
 			LOG(IMPORTANT, "rating increased to %i", rating);
 			playOnce("simtower/rating/increased");
+			char msg[64];
+			snprintf(msg, sizeof(msg), "Rating increased to %i!", rating);
+			timeWindow.showMessage(msg);
 		}
 		timeWindow.updateRating();
+		toolboxWindow.updateLockedButtons();
 	}
 }
 
@@ -933,15 +1169,56 @@ void Game::setPopulation(int p)
  *  population, or an item constructed. */
 void Game::ratingMayIncrease()
 {
+	int securityCount = 0;
+	if (itemsByType.count("security") != 0)
+		securityCount = (int)itemsByType["security"].size();
+
+	int hotelSuiteCount = 0;
+	if (itemsByType.count("suite") != 0)
+		hotelSuiteCount = (int)itemsByType["suite"].size();
+
+	bool hasRecycling = (itemsByType.count("recycling") != 0 && !itemsByType["recycling"].empty());
+	bool hasMedical = (itemsByType.count("medicalcenter") != 0 && !itemsByType["medicalcenter"].empty());
+	bool hasCathedral = (itemsByType.count("cathedral") != 0 && !itemsByType["cathedral"].empty());
+
 	switch (rating) {
 		case 0: {
-			if (population >= 300) setRating(1);
+			// 1 star -> 2 stars: 300 population (Security unlocks at 2 stars)
+			if (population >= RatingRules::kRating2Population)
+				setRating(1);
 		} break;
 		case 1: {
-			if (population >= 1000) {
-				//TODO: check for security center presence.
+			// 2 stars -> 3 stars: 1000 population + at least one Security office
+			if (population >= RatingRules::kRating3Population && securityCount >= RatingRules::kRating3SecurityCount)
+				setRating(2);
+			else if (population >= RatingRules::kRating3Population)
 				timeWindow.showMessage("Your tower needs security.");
-			}
+		} break;
+		case 2: {
+			// 3 stars -> 4 stars: 5000 pop + 2+ hotel suites + recycling + medical + favorable VIP visit
+			if (population >= RatingRules::kRating4Population &&
+			    hotelSuiteCount >= RatingRules::kRating4HotelSuites &&
+			    hasRecycling && hasMedical &&
+			    favorableVipVisit)
+				setRating(3);
+			else if (population >= RatingRules::kRating4Population &&
+			         hotelSuiteCount >= RatingRules::kRating4HotelSuites &&
+			         hasRecycling && hasMedical)
+				timeWindow.showMessage("A favorable VIP visit is required for 4 stars.");
+		} break;
+		case 3: {
+			// 4 stars -> 5 stars: 10000 population + Metro
+			if (population >= RatingRules::kRating5Population && metroStation != NULL)
+				setRating(4);
+			else if (population >= RatingRules::kRating5Population)
+				timeWindow.showMessage("Your tower needs a Metro Station.");
+		} break;
+		case 4: {
+			// 5 stars -> Tower: 15000 population + Cathedral + all above-ground developed
+			if (population >= RatingRules::kTowerPopulation && hasCathedral && isTowerFullyDeveloped())
+				setRating(5);
+			else if (population >= RatingRules::kTowerPopulation && hasCathedral)
+				timeWindow.showMessage("Develop all floors above ground for Tower status.");
 		} break;
 	}
 }
@@ -988,6 +1265,7 @@ void Game::playOnce(Path sound)
 	//Actually play the sound.
 	Sound * snd = new Sound;
 	snd->setBuffer(app.sounds[sound]);
+	snd->setVolume(app.soundVolume);
 	snd->Play(this);
 	autoreleaseSounds.insert(snd);
 }
