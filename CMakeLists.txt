@@ -151,9 +151,11 @@ IF(BUILD_WITH_DOCS)
 find_package(Doxygen)
 if (DOXYGEN_FOUND)
 	message(STATUS "Doxygen found: ${DOXYGEN_EXECUTABLE} -- ${DOXYGEN_VERSION}")
-	# Set Doxygen input and output files.
-	set(DOXYGEN_INPUT_DIR ${PROJECT_SOURCE_DIR}/source)
-	set(DOXYGEN_INDEX_FILE ${DOXYGEN_OUTPUT_DIR}/xml/index.xml)
+	# Set Doxygen input and output files (separate vars so INPUT gets two paths).
+	set(DOXYGEN_SOURCE_DIR "${PROJECT_SOURCE_DIR}/source")
+	set(DOXYGEN_DOC_DIR "${PROJECT_SOURCE_DIR}/doc")
+	set(DOXYGEN_STRIP_PREFIX "${PROJECT_SOURCE_DIR}")
+	set(DOXYGEN_INDEX_FILE "${CMAKE_CURRENT_BINARY_DIR}/html/index.html")
 	set(DOXYFILE_IN ${CMAKE_CURRENT_SOURCE_DIR}/doc/source/Doxyfile)
 	set(DOXYFILE_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
 	# Generate DoxyFile from the input file.
