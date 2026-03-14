@@ -4,7 +4,7 @@
 
 using namespace OT;
 
-const static double kDayDuration = 3.2; // minutes / game day
+const static double kDayDuration = 4.0; // minutes / game day (tuned so cinema patrons can reach theatre in time)
 const double Time::kBaseSpeed    = 1.0 / 60 / kDayDuration; // game days / second
 
 
