@@ -1,0 +1,28 @@
+<rml>
+	<head>
+		<style>
+			body {
+				top: 0; left: 0; right: 0; bottom: 0;
+				background-color: rgba(0, 0, 0, 0.5);
+			}
+			div.box {
+				top: 50%; left: 50%;
+				width: 280px; margin-left: -140px; margin-top: -50px;
+				padding: 16px;
+				background-color: rgba(56, 56, 56, 0.98);
+				font-family: Jura;
+				border: 2px solid #888;
+			}
+			p { color: #eee; font-size: 14px; margin-bottom: 14px; }
+			button { display: inline-block; padding: 8px 16px; margin: 4px; font-family: Jura; font-size: 13px; background: #555; color: #eee; border: 1px solid #777; }
+			button:hover { background: #666; }
+		</style>
+	</head>
+	<body>
+		<div class="box">
+			<p>Unsaved changes will be lost. Quit to menu anyway?</p>
+			<button id="quit_yes">Quit</button>
+			<button id="quit_no">Cancel</button>
+		</div>
+	</body>
+</rml>
