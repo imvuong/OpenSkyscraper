@@ -1,4 +1,5 @@
 #include <cassert>
+#include "Game.h"
 #include "Item/Item.h"
 #include "Person.h"
 
@@ -42,21 +43,31 @@ void Person::Journey::set(const Route & r)
 
 void Person::Journey::next()
 {
-	//Remove the person from where he/she is currently at.
-	if (person->at) person->at->removePerson(person);
-	
-	//Keep the current floor around.
-	fromFloor = toFloor;
-	
-	//Jump to next node.
+	//Peek next node (we will pop current first).
 	assert(!nodes.empty());
 	nodes.pop();
-	assert(!nodes.empty());
-	
-	//Add the person to the node's item.
-	item    = nodes.front().item;
-	toFloor = nodes.front().toFloor;
-	assert(item);
+	if (nodes.empty()) return;
+	Route::Node nextNode = Route::Node();
+	nextNode.item = nodes.front().item;
+	nextNode.toFloor = nodes.front().toFloor;
+
+	//If the next node's item was removed (e.g. elevator deleted), invalidate route and stay put.
+	if (!nextNode.item || person->game->items.count(nextNode.item) == 0) {
+		while (!nodes.empty()) nodes.pop();
+		item = NULL;
+		toFloor = fromFloor;
+		return;
+	}
+
+	//Remove the person from where he/she is currently at.
+	if (person->at) person->at->removePerson(person);
+
+	//Keep the current floor around.
+	fromFloor = toFloor;
+
+	//Add the person to the next node's item.
+	item    = nextNode.item;
+	toFloor = nextNode.toFloor;
 	item->addPerson(person);
 }
 
