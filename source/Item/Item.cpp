@@ -59,8 +59,29 @@ void Item::removeSprite(Sprite * sprite)
 	sprites.erase(sprite);
 }
 
+void Item::advance(double dt)
+{
+	if (constructionTimer > 0) {
+		constructionTimer -= dt;
+		if (constructionTimer < 0) constructionTimer = 0;
+	}
+}
+
 void Item::draw(sf::RenderTarget & target, sf::RenderStates states) const
 {
+	if (constructionTimer > 0 && prototype->icon != ICON_FLOOR) {
+		Path constructionBitmap = (prototype->icon == ICON_LOBBY) ? Path("simtower/construction/grid") : Path("simtower/construction/solid");
+		if (app->bitmaps.getResources().find(constructionBitmap) != app->bitmaps.getResources().end()) {
+			Sprite cons;
+			cons.SetImage(app->bitmaps[constructionBitmap]);
+			cons.setOrigin(0, getSizePixels().y);
+			cons.setPosition(getPositionPixels().x, -getPositionPixels().y);
+			cons.setScale((float)(size.x * 8) / cons.getTexture()->getSize().x, (float)(size.y * 36) / cons.getTexture()->getSize().y);
+			game->drawnSprites++;
+			target.draw(cons);
+		}
+		return;
+	}
 	render(target);
 }
 
