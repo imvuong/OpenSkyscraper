@@ -59,7 +59,7 @@ bool SimTowerLoader::load()
 		success = exe.load(paths[i]);
 	}
 
-	//Since no SIMTOWER.EXE was found, try to find a compressed SIMTOWER.EX_.
+	//Since no SIMTOWER.EXE was found, try cache then decompress SIMTOWER.EX_.
 	DataManager::Paths compressedPaths;
 #ifdef MSPACK
 	if (!success) {
@@ -78,35 +78,36 @@ bool SimTowerLoader::load()
 		else			 tmp.append("/tmp");
 		if (!tmp.empty() && *tmp.rbegin() != '/') tmp.append("/");
 #endif
-		tmp.append("SIMTOWER.EXE");
-		Path decompressedPath(tmp);
+		tmp.append("openskyscraper_SIMTOWER.EXE");
+		Path cachePath(tmp);
 
-		//Iterate through the possible locations and try to decompress each, until one is found.
-		compressedPaths = app->data.paths("SIMTOWER.EX_");
-		mskwaj_decompressor * d = mspack_create_kwaj_decompressor(NULL);
-		if (d) {
-			for (int i = 0; i < compressedPaths.size() && !success; i++) {
-				const Path &path = compressedPaths[i];
-				if (!fileExists(path)) continue;
-
-				LOG(INFO, "Decompressing %s to %s", path.c_str(), decompressedPath.c_str());
-				int result = d->decompress(d, path.c_str(), decompressedPath.c_str());
-				if (result != MSPACK_ERR_OK) {
-					LOG(ERROR, "Unable to decompress file %s.", path.c_str());
-				} else {
-					success = true;
-				}
-			}
-			mspack_destroy_kwaj_decompressor(d);
-		} else {
-			LOG(WARNING, "Unable to initialize mskwaj_decompressor. Decompressing SIMROWER.EX_ is therefore not possible.");
+		// Try loading from cache first (avoid decompressing every launch).
+		if (fileExists(cachePath)) {
+			LOG(INFO, "Trying cached executable %s", cachePath.c_str());
+			success = exe.load(cachePath);
 		}
 
-		//If the decompression was successful, try to load the resources from there.
-		if (success) {
-			success = exe.load(decompressedPath);
-			if (!success) {
-				LOG(WARNING, "Unable to load previously decompressed file %s.", decompressedPath.c_str());
+		if (!success) {
+			compressedPaths = app->data.paths("SIMTOWER.EX_");
+			mskwaj_decompressor * d = mspack_create_kwaj_decompressor(NULL);
+			if (d) {
+				for (int i = 0; i < compressedPaths.size() && !success; i++) {
+					const Path &path = compressedPaths[i];
+					if (!fileExists(path)) continue;
+
+					LOG(INFO, "Decompressing %s to %s (cached for next launch)", path.c_str(), cachePath.c_str());
+					int result = d->decompress(d, path.c_str(), cachePath.c_str());
+					if (result != MSPACK_ERR_OK) {
+						LOG(ERROR, "Unable to decompress file %s.", path.c_str());
+					} else {
+						success = exe.load(cachePath);
+						if (!success)
+							LOG(WARNING, "Unable to load decompressed file %s.", cachePath.c_str());
+					}
+				}
+				mspack_destroy_kwaj_decompressor(d);
+			} else {
+				LOG(WARNING, "Unable to initialize mskwaj_decompressor. Decompressing SIMTOWER.EX_ is therefore not possible.");
 			}
 		}
 	}
