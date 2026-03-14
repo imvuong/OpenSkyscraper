@@ -50,6 +50,7 @@
 				background-image-t: 0px 32px;
 			}
 			button.item:active, button.item.selected { background-image-t: 32px 64px; }
+			button.item.locked { opacity: 0.45; }
 		</style>
 	</head>
 	

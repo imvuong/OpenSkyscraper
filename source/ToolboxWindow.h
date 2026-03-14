@@ -24,5 +24,6 @@ namespace OT {
 		
 		void updateSpeed();
 		void updateTool();
+		void updateLockedButtons();
 	};
 }
