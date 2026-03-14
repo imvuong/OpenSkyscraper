@@ -10,6 +10,9 @@ Build
 data/resources
 data/SIMTOWER.EX_
 
+# CMake / IDE
+compile_commands.json
+
 # Project Files
 *.kdev4
 *.anjuta
