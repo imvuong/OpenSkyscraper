@@ -40,7 +40,8 @@ private:
 	static const int FLOOR_COST		  = 5;
 	static const int ESCALATOR_COST	  = 10;
 	static const int STAIRS_COST	  = 30;
-	static const int ELEVATOR_COST	  = STAIRS_COST*3 + WALKING_COST*MAX_WALKING_DIST;
-	static const int EXPRESS_COST	  = 20;
+	/** Balanced so elevators are viable for multi-floor trips; express preferred over standard. */
+	static const int ELEVATOR_COST	  = 45;
+	static const int EXPRESS_COST	  = 12;
 	static const int INHIBITORY_COST  = 10000;
 };
