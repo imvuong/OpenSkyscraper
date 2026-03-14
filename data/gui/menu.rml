@@ -1,0 +1,49 @@
+<rml>
+	<head>
+		<style>
+			body {
+				top: 50%;
+				left: 50%;
+				width: 280px;
+				margin-left: -140px;
+				margin-top: -120px;
+				padding: 20px;
+				background-color: rgba(32, 32, 32, 0.95);
+				font-family: Jura;
+				border: 2px solid #666;
+			}
+			h1 {
+				display: block;
+				text-align: center;
+				color: #eee;
+				font-size: 24px;
+				margin-bottom: 24px;
+			}
+			button {
+				display: block;
+				width: 100%;
+				padding: 12px;
+				margin: 8px 0;
+				font-family: Jura;
+				font-size: 16px;
+				background-color: #444;
+				color: #eee;
+				border: 1px solid #666;
+			}
+			button:hover {
+				background-color: #555;
+			}
+			button:active {
+				background-color: #666;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>OpenSkyscraper</h1>
+		<button id="newgame">New Game</button>
+		<button id="load1">Load Slot 1</button>
+		<button id="load2">Load Slot 2</button>
+		<button id="load3">Load Slot 3</button>
+		<button id="quit">Quit</button>
+	</body>
+</rml>

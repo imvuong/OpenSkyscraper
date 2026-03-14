@@ -3,6 +3,7 @@
 
 #include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>
+#include <functional>
 #include <stack>
 
 #include "BitmapManager.h"
@@ -28,9 +29,13 @@
 
 namespace OT
 {
+	class Game;
+	class MenuState;
+
 	class Application
 	{
 		friend class State;
+		friend class MenuState;
 
 	public:
 		Application(int argc, char * argv[]);
@@ -49,7 +54,18 @@ namespace OT
 		FontManager   fonts;
 		SoundManager  sounds;
 
+		int optionWidth;
+		int optionHeight;
+		bool optionFullscreen;
+		float soundVolume;
+
 		int run();
+
+		/** Pops current state and pushes the main menu (used by Game pause menu "Quit to menu"). */
+		void requestQuitToMenu();
+
+		/** Schedules a state change to run after the current event is fully processed (avoids use-after-free when menu calls pop/push from ProcessEvent). */
+		void scheduleStateChange(std::function<void()> action);
 
 	private:
 		Path path;
@@ -59,12 +75,16 @@ namespace OT
 		int exitCode;
 
 		void init();
+		void loadOptions();
+		void saveOptions();
 		void loop();
 		void cleanup();
 
 		std::stack<State *> states;
 		void pushState(State * state);
 		void popState();
+
+		std::function<void()> pendingStateChange;
 
 		bool dumpResources;
 		Path dumpResourcesPath;

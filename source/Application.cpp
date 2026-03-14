@@ -9,6 +9,7 @@
 
 #include "Application.h"
 #include "Game.h"
+#include "MenuState.h"
 #include "SimTowerLoader.h"
 #include "TimeWindowWatch.h"
 #include "OpenGL.h"
@@ -26,7 +27,11 @@ Application::Application(int argc, char * argv[])
 :	data(this),
 	fonts(this),
 	bitmaps(this),
-	sounds(this)
+	sounds(this),
+	optionWidth(1280),
+	optionHeight(768),
+	optionFullscreen(false),
+	soundVolume(100.f)
 {
 	assert(App == NULL && "Application initialized multiple times");
 	App = this;
@@ -111,6 +116,37 @@ int Application::run()
 	return exitCode;
 }
 
+void Application::loadOptions()
+{
+	DataManager::Paths paths = data.paths("options.cfg");
+	for (size_t i = 0; i < paths.size(); i++) {
+		FILE * f = fopen(paths[i].c_str(), "r");
+		if (!f) continue;
+		char line[256];
+		while (fgets(line, sizeof(line), f)) {
+			int w, h, fs;
+			float vol;
+			if (sscanf(line, "width=%d", &w) == 1 && w >= 640 && w <= 4096) optionWidth = w;
+			else if (sscanf(line, "height=%d", &h) == 1 && h >= 480 && h <= 2160) optionHeight = h;
+			else if (sscanf(line, "fullscreen=%d", &fs) == 1) optionFullscreen = (fs != 0);
+			else if (sscanf(line, "volume=%f", &vol) == 1 && vol >= 0 && vol <= 100) soundVolume = vol;
+		}
+		fclose(f);
+		break;
+	}
+}
+
+void Application::saveOptions()
+{
+	DataManager::Paths paths = data.paths("saves/default.tower");
+	if (paths.empty()) return;
+	Path optionsPath = paths[0].up().down("options.cfg");
+	FILE * f = fopen(optionsPath.c_str(), "w");
+	if (!f) return;
+	fprintf(f, "width=%d\nheight=%d\nfullscreen=%d\nvolume=%.0f\n", optionWidth, optionHeight, optionFullscreen ? 1 : 0, (double)soundVolume);
+	fclose(f);
+}
+
 /** Initializes the application. This includes loading resources, initializing the
  *  graphics context, and setting up the GUI. */
 void Application::init()
@@ -141,12 +177,14 @@ void Application::init()
 	delete simtower; simtower = NULL;
 	//exitCode = 1;
 
-	videoMode.width        = 1280;
-	videoMode.height       = 768;
+	loadOptions();
+	videoMode.width        = optionWidth;
+	videoMode.height       = optionHeight;
 	videoMode.bitsPerPixel = 32;
 
-
-	window.create(videoMode, "OpenSkyscraper SFML");
+	sf::Uint32 style = sf::Style::Close | sf::Style::Titlebar;
+	if (optionFullscreen) style = sf::Style::Fullscreen;
+	window.create(videoMode, "OpenSkyscraper", style);
 	window.setVerticalSyncEnabled(true);
 
 	if (!gui.init(&window)) {
@@ -179,9 +217,8 @@ void Application::init()
 	Rocket::Core::FontDatabase::LoadFontFace(rocket.down("Delicious-Italic.otf").c_str());
 	Rocket::Core::FontDatabase::LoadFontFace(rocket.down("Delicious-Roman.otf").c_str());*/
 
-	Game * game = new Game(*this);
-	pushState(game);
-	LOG(IMPORTANT, "Application::init() COMPLETED SUCCESSFULLY, Game state pushed.");
+	pushState(new MenuState(*this));
+	LOG(IMPORTANT, "Application::init() COMPLETED SUCCESSFULLY, Menu state pushed.");
 }
 
 /** The main loop of the application. This function handles events, updates the
@@ -230,11 +267,16 @@ void Application::loop()
 				LOG(INFO, "resized (%i, %i)", window.getSize().x, window.getSize().y);
 				window.setView(sf::View(sf::FloatRect(0, 0, window.getSize().x, window.getSize().y)));
 			}
+			rootGUI->handleEvent(event);
+			if (!states.empty()) {
+				if (states.top()->handleEvent(event))
+					continue;
+				if (states.top()->gui.handleEvent(event))
+					continue;
+			}
 			if (event.type == sf::Event::KeyPressed) {
 				if (event.key.code == sf::Keyboard::Escape) {
 					exitCode = 1;
-					// Game * old = (Game *)states.top();
-					// old->quit();
 					continue;
 				}
 				if (event.key.code == sf::Keyboard::R && event.key.control) {
@@ -256,18 +298,18 @@ void Application::loop()
 				}
 #endif
 			}
-			rootGUI->handleEvent(event);
-			if (!states.empty()) {
-				if (states.top()->handleEvent(event))
-					continue;
-				if (states.top()->gui.handleEvent(event))
-					continue;
-			}
 			if (event.type == sf::Event::Closed) {
 				LOG(WARNING, "current state did not handle sf::Event::Closed");
 				exitCode = 1;
 				continue;
 			}
+		}
+
+		// Run any state change scheduled from within an event handler (avoids use-after-free).
+		if (pendingStateChange) {
+			std::function<void()> fn = std::move(pendingStateChange);
+			pendingStateChange = nullptr;
+			fn();
 		}
 
 		//Make the current state do its work.
@@ -336,6 +378,17 @@ void Application::cleanup()
 
 	window.close();
 	LOG(IMPORTANT, "Application::cleanup() EXITED.");
+}
+
+void Application::requestQuitToMenu()
+{
+	while (!states.empty()) popState();
+	pushState(new MenuState(*this));
+}
+
+void Application::scheduleStateChange(std::function<void()> action)
+{
+	pendingStateChange = std::move(action);
 }
 
 /** Pushes the given State ontop of the state stack, causing it to receive events. */
