@@ -1,0 +1,21 @@
+<tower version="1" funds="3292758" rating="0" time="3.456118" speed="0" rainy="0" tool="finger" x="0" y="200" favorableVipVisit="0">
+    <item type="office" x="15" y="3" rent="10000" rentDeposit="10000" variant="0" occupied="0" lit="1"/>
+    <item type="office" x="41" y="3" rent="10000" rentDeposit="10000" variant="0" occupied="0" lit="1"/>
+    <item type="office" x="-28" y="3" rent="10000" rentDeposit="10000" variant="0" occupied="0" lit="1"/>
+    <item type="office" x="-6" y="3" rent="10000" rentDeposit="10000" variant="0" occupied="0" lit="1"/>
+    <item type="floor" x="-46" y="3" width="96"/>
+    <item type="elevator-standard" x="-10" y="0" height="1">
+        <car altitude="0.000000"/>
+        <car altitude="0.000000"/>
+    </item>
+    <item type="elevator-standard" x="-14" y="-1" height="1">
+        <car altitude="-1.000000"/>
+    </item>
+    <item type="lobby" x="-54" y="0" width="107" high="1"/>
+    <item type="floor" x="-14" y="-1" width="23"/>
+    <item type="office" x="-46" y="3" rent="10000" rentDeposit="10000" variant="0" occupied="0" lit="1"/>
+    <item type="floor" x="-54" y="2" width="4"/>
+    <item type="floor" x="-54" y="1" width="4"/>
+    <item type="fastfood" x="-7" y="-1" variant="3" open="0"/>
+    <item type="floor" x="-54" y="0" width="107"/>
+</tower>
