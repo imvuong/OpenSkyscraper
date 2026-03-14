@@ -25,6 +25,7 @@ namespace OT {
 		ICON_CINEMA = 14,
 		ICON_PARTYHALL = 15,
 		ICON_METRO = 19,
+		ICON_CATHEDRAL = 20,
 	};
 
 	namespace Item {

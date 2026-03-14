@@ -26,6 +26,7 @@
 #include "ParkingSpace.h"
 #include "Shop.h"
 #include "Housekeeping.h"
+#include "Cathedral.h"
 
 using namespace OT;
 using namespace Item;
@@ -69,6 +70,7 @@ void Factory::loadPrototypes()
 	register_item(ParkingSpace);
 	register_item(Shop);
 	register_item(Housekeeping);
+	register_item(Cathedral);
 	#undef register_item
 	
 	for (int i = 0; i < prototypes.size(); i++) {
