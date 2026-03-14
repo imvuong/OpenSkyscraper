@@ -13,6 +13,7 @@ namespace OT {
 					p->price = 1000000;
 					p->size  = int2(6,1);
 					p->icon  = 6;
+					p->minRating = 2;
 				}
 				
 				virtual void init()

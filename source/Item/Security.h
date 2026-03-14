@@ -16,6 +16,7 @@ namespace OT {
                 p->price = 100000;
                 p->size = int2(16,1);
                 p->icon = 21;
+                p->minRating = 1;
             }
             virtual ~Security();
 

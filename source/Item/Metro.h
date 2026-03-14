@@ -16,6 +16,7 @@ namespace OT {
 				p->icon  = 19;
 				p->entrance_offset = 2;
 				p->exit_offset = 2;
+				p->minRating = 3;
 			}
 			virtual ~Metro();
 			
@@ -26,6 +27,7 @@ namespace OT {
 			
 			bool open;
 			bool trainPresent;
+			bool wasTrainPresent;
 			
 			Sprite station;
 			Sprite platform;

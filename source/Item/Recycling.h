@@ -15,6 +15,7 @@ namespace OT {
                 p->price = 100000;
                 p->size = int2(25,2);
                 p->icon = 18;
+                p->minRating = 2;
             }
             virtual ~Recycling();
 

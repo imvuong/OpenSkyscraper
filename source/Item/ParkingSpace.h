@@ -15,6 +15,7 @@ namespace OT {
                 p->price = 100000;
                 p->size = int2(16,1);
                 p->icon = 17;
+                p->minRating = 2;
             }
             virtual ~ParkingSpace();
 

@@ -22,6 +22,8 @@ namespace OT {
 			int price;
 			int2 size;
 			int icon;
+			/** Minimum star rating (0–5) required to build this item. 0 = 1 star, 1 = 2 stars, etc. */
+			int minRating;
 			int entrance_offset;
 			int exit_offset;
 			

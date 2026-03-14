@@ -15,6 +15,7 @@ namespace OT {
                 p->price = 100000;
                 p->size = int2(32,1);
                 p->icon = 22;
+                p->minRating = 2;
             }
             virtual ~MedicalCenter();
 

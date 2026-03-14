@@ -37,7 +37,8 @@ namespace OT {
 			 */
 			class Worker : public Person {
 			public:
-				Worker(Office *item, Person::Type type) : Person(item->game, type) {}
+				Worker(Office *item, Person::Type type) : Person(item->game, type), office(item) {}
+				Office * const office;
 
 				/// When the worker is supposed to arrive at the tower in the morning.
 				double arrivalTime;
@@ -86,6 +87,10 @@ namespace OT {
 		protected:
 			void updateSprite();
 			void rescheduleWorkers();
+			virtual void updateRoutes() override;
+
+			/** Route from a parking item to this office (for workers arriving by car). */
+			Route parkingRoute;
 
 			int rent;
 			int rentDeposit;

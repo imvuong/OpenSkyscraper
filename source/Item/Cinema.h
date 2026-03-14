@@ -16,6 +16,7 @@ namespace OT {
 				p->size  = int2(31,2);
 				p->icon  = 14;
 				p->entrance_offset = 1;
+				p->minRating = 2;
 			}
 			virtual ~Cinema();
 			

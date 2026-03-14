@@ -20,7 +20,7 @@ namespace OT {
 		public:
 			int layer;
 			AbstractPrototype * const prototype;
-			Item(Game * game, AbstractPrototype * prototype) : GameObject(game), sf::Drawable(), prototype(prototype), size(prototype->size) { layer = 0; population = 0; }
+			Item(Game * game, AbstractPrototype * prototype) : GameObject(game), sf::Drawable(), prototype(prototype), size(prototype->size) { layer = 0; population = 0; constructionTimer = 0; }
 			virtual ~Item();
 			virtual void init() {}
 
@@ -53,7 +53,10 @@ namespace OT {
 				return c;
 			}
 
-			virtual void advance(double dt) {}
+			virtual void advance(double dt);
+
+			/** Seconds remaining of construction animation (0 = complete). Set when item is first placed. */
+			double constructionTimer;
 
 			typedef std::set<Person *> People;
 			People people;
@@ -81,6 +84,7 @@ namespace OT {
 		AbstractPrototype * p = new Prototype<cls>;\
 		p->entrance_offset = 0;\
 		p->exit_offset = 0;\
+		p->minRating = 0;\
 		initPrototype(p);\
 		return p;\
 	}\

@@ -14,6 +14,7 @@ namespace OT {
 				p->price = 200000;
 				p->size  = int2(24,1);
 				p->icon  = 12;
+				p->minRating = 2;
 			}
 			virtual ~Restaurant();
 			
