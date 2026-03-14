@@ -185,6 +185,15 @@ void Application::init()
 	sf::Uint32 style = sf::Style::Close | sf::Style::Titlebar;
 	if (optionFullscreen) style = sf::Style::Fullscreen;
 	window.create(videoMode, "OpenSkyscraper", style);
+	// Center window on desktop (avoids WSL/X11 placing it half off-screen); clamp to keep on-screen.
+	if (!optionFullscreen) {
+		sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
+		int x = static_cast<int>(desktop.width) - static_cast<int>(videoMode.width);
+		int y = static_cast<int>(desktop.height) - static_cast<int>(videoMode.height);
+		x = (x / 2) > 0 ? (x / 2) : 0;
+		y = (y / 2) > 0 ? (y / 2) : 0;
+		window.setPosition(sf::Vector2i(x, y));
+	}
 	window.setVerticalSyncEnabled(true);
 
 	if (!gui.init(&window)) {
