@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 2.6)
 project(OpenSkyscraper)
 
+# Generate compile_commands.json for IDE "Go to Definition" / clangd.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Executable name.
 set(EXECUTABLE_NAME OpenSkyscraper)
 
@@ -46,6 +49,7 @@ set(MACOSX_BUNDLE_BUNDLE_VERSION ${VERSION})
 
 # Gather the source files.
 file(GLOB_RECURSE sources RELATIVE ${PROJECT_SOURCE_DIR} source/*.cpp)
+list(APPEND sources source/RandomEvents.cpp)
 
 # TinyXML2
 include_directories(thirdparty/tinyxml2)
