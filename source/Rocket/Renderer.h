@@ -28,6 +28,7 @@
 
 #include <Rocket/Core/RenderInterface.h>
 #include <SFML/Graphics.hpp>
+#include <set>
 
 namespace OT
 {
@@ -67,5 +68,7 @@ namespace OT
 
 	private:
 		sf::RenderWindow *MyWindow;
+		/// Handles we allocated in GenerateTexture(); only these must be deleted in ReleaseTexture.
+		std::set<Rocket::Core::TextureHandle> ownedTextures;
 	};
 }

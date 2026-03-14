@@ -320,14 +320,21 @@ bool RocketRenderer::GenerateTexture(
 	image->update(source);
 
 	texture_handle = (Rocket::Core::TextureHandle)image;
+	ownedTextures.insert(texture_handle);
 
 	return true;
 }
 
 // Called by Rocket when a loaded texture is no longer required.
+// We must only delete textures we allocated in GenerateTexture(); LoadTexture() passes
+// pointers into App->bitmaps (BitmapManager-owned), which must not be freed here.
 void RocketRenderer::ReleaseTexture(Rocket::Core::TextureHandle texture_handle)
 {
 	MyWindow->setActive();
 
-	delete (sf::Texture *)texture_handle;
+	std::set<Rocket::Core::TextureHandle>::iterator it = ownedTextures.find(texture_handle);
+	if (it != ownedTextures.end()) {
+		ownedTextures.erase(it);
+		delete (sf::Texture *)texture_handle;
+	}
 }
