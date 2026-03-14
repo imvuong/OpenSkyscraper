@@ -42,7 +42,8 @@ namespace OT {
 				typedef std::set<Car *> Cars;
 				Cars cars;
 				void clearCars();
-				void addCar(int floor);
+				/** Adds a car at the given floor. Returns false if at kMaxCarsPerElevator limit. */
+				bool addCar(int floor);
 
 				typedef enum {
 					kUp   = 1,

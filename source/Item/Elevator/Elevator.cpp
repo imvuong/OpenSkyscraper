@@ -1,4 +1,5 @@
 #include <cassert>
+#include "../../RatingRules.h"
 #include "../../Sprite.h"
 #include "Elevator.h"
 #include "Car.h"
@@ -145,6 +146,8 @@ void Elevator::decodeXML(tinyxml2::XMLElement & xml)
 		unservicedFloors.insert(e->IntAttribute("floor"));
 	}
 	for (tinyxml2::XMLElement * e = xml.FirstChildElement("car"); e; e = e->NextSiblingElement("car")) {
+		if (cars.size() >= (size_t)RatingRules::kMaxCarsPerElevator)
+			break;
 		Car * car = new Car(this);
 		car->decodeXML(*e);
 		cars.insert(car);
@@ -219,13 +222,16 @@ void Elevator::clearCars()
 	cars.clear();
 }
 
-void Elevator::addCar(int floor)
+bool Elevator::addCar(int floor)
 {
+	if (cars.size() >= (size_t)RatingRules::kMaxCarsPerElevator)
+		return false;
 	Car * car = new Car(this);
 	car->setAltitude(floor);
 	car->startAltitude = floor;
 	car->destinationFloor = floor;
 	cars.insert(car);
+	return true;
 }
 
 bool Elevator::connectsFloor(int floor) const
